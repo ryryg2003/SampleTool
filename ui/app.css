@@ -583,3 +583,4 @@ button.card:not(:disabled):hover { border-color: var(--line); background: #29303
 }
 
 .check-sm { font-size: 12px; color: var(--muted); font-weight: 400; white-space: nowrap; }
+.vsum { margin: 8px 0 0; font-size: 12px; }

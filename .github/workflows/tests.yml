@@ -1,0 +1,59 @@
+name: tests
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  python:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python: ["3.10", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Unit, end-to-end and Windows/NTFS tests
+        run: python tests/run_all.py
+      - name: Large library (5,000 files)
+        env:
+          SLO_E2E_LARGE: "5000"
+        run: python -m unittest -v tests.test_e2e.LargeScanTest
+
+  ui:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Playwright (test tooling only; the app itself needs no Node)
+        run: |
+          npm init -y
+          npm install playwright@1.48.2
+          npx playwright install chromium
+      - name: UI smoke in fixture mode
+        shell: bash
+        run: |
+          python -m samplelib --root "$RUNNER_TEMP/empty" --data-dir "$RUNNER_TEMP/data" --port 8799 --no-browser &
+          sleep 3
+          node tests/ui_smoke.js "http://127.0.0.1:8799/?fixture=1" "$RUNNER_TEMP/shots-fixture"
+      - name: Full producer flow through the UI (disposable fixture)
+        shell: bash
+        run: node tests/ui_flow.js "$RUNNER_TEMP/shots-flow"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots-${{ matrix.os }}
+          path: ${{ runner.temp }}/shots-*

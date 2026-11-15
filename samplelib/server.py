@@ -33,7 +33,7 @@ class App:
         self.store = store
         self.job_lock = threading.Lock()
         self.cancel = threading.Event()
-        self.progress: dict = {"job": "idle", "phase": "", "running": False, "done": 0,
+        self.progress: dict = {"seq": 0, "job": "idle", "phase": "", "running": False, "done": 0,
                                "total": 0, "bytes_done": 0, "bytes_total": 0, "current": "",
                                "warnings": 0, "errors": [], "message": ""}
         self._plock = threading.Lock()
@@ -56,7 +56,8 @@ class App:
         if not self.job_lock.acquire(blocking=False):
             raise RuntimeError(f"Another task is running ({self.progress.get('job')}). Wait for it or cancel it.")
         self.cancel.clear()
-        self.set_progress({"job": name, "phase": "starting", "running": True, "done": 0,
+        self.seq = getattr(self, "seq", 0) + 1  # lets the UI notice jobs that start and end between polls
+        self.set_progress({"seq": self.seq, "job": name, "phase": "starting", "running": True, "done": 0,
                            "total": 0, "bytes_done": 0, "bytes_total": 0, "current": "",
                            "warnings": 0, "errors": [], "message": ""})
 
@@ -269,10 +270,25 @@ class Handler(BaseHTTPRequestHandler):
             ex = None
             if st.execution:
                 e = st.execution
-                ex = {"ran": True, "plan_hash": e.get("plan_hash"), "interrupted": e.get("interrupted"),
+                import datetime as _dt
+                ran = _dt.datetime.fromtimestamp(e.get("ts") or time.time()).isoformat(timespec="seconds")
+                ex = {"ran": ran, "plan_hash": e.get("plan_hash"), "interrupted": e.get("interrupted"),
                       "results_summary": _count(e.get("results", []), "status"),
                       "reports": e.get("reports") or {}, "verification": e.get("verification")}
+            if ex and isinstance(ex.get("verification"), dict):
+                v = dict(ex["verification"])
+                v.setdefault("storage_avoided_bytes", v.get("bytes_avoided"))
+                v.setdefault("space_freed_bytes", v.get("bytes_freed"))
+                v.setdefault("unresolved", [*(v.get("missing") or []), *(v.get("size_mismatch") or []),
+                                            *(v.get("hash_mismatch") or []),
+                                            *(v.get("link_identity_mismatch") or []),
+                                            *(v.get("kits_incomplete") or [])])
+                ex["verification"] = v
+            from .store import scan_summary
+            with st.lock:
+                ssum = scan_summary(st) if st.items else None
             return self._send(200, {"root": st.root, "dest_root": st.dest_root, "data_dir": st.data_dir,
+                                    "scan_summary": ssum,
                                     "has_inventory": bool(st.items), "progress": app.get_progress(),
                                     "plan": plan, "execution": ex,
                                     "counts": {"files": sum(1 for i in st.items if i["origin"] == "incoming"),

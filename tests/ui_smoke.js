@@ -208,10 +208,13 @@ function url(hash) {
       check('op table renders rows', (await page.locator(opRows).count()) > 0);
       await page.click('#op-group [data-g="action"]');
       await settle(500);
-      await page.selectOption('#op-action', 'hold');
+      // Filter on an action the current plan really contains (prefer hold, then keep).
+      const byAction = await page.evaluate(() => (App.state.plan && App.state.plan.summary && App.state.plan.summary.by_action) || {});
+      const pick = ['hold', 'keep', 'link', 'move'].find((a) => byAction[a] > 0) || 'move';
+      await page.selectOption('#op-action', pick);
       await settle(500);
-      const acts = await page.$$eval(`${opRows} .act`, (as) => as.map((a) => a.textContent));
-      check('action filter', acts.length > 0 && acts.every((a) => a === 'Hold'), acts.slice(0, 5).join(','));
+      const acts = await page.$$eval(`${opRows} .act`, (as) => as.map((a) => a.textContent.trim().toLowerCase()));
+      check('action filter', acts.length > 0 && acts.every((a) => a.startsWith(pick)), pick + ': ' + acts.slice(0, 5).join(','));
       await page.locator(opRows).first().click();
       await settle(200);
       check('op detail opens', await page.isVisible('#op-detail'));

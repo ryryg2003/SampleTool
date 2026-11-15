@@ -345,6 +345,10 @@ class Store:
 
     # ------------------------------------------------------------------- plan
     def set_plan(self, plan: dict, gen: Optional[int] = None) -> None:
+        bba: dict = {}
+        for o in plan.get("ops", []):
+            bba[o.get("action")] = bba.get(o.get("action"), 0) + int(o.get("size") or 0)
+        plan.setdefault("summary", {}).setdefault("bytes_by_action", bba)
         with self.lock:
             self.plan = plan
             self.plan_stale = gen is not None and gen != self.gen
@@ -463,6 +467,8 @@ class Store:
         terms = g("q").casefold().split()
         eq = {k: g(k) for k in ("pack", "manufacturer", "category", "instrument", "loop_type",
                                 "key", "genre", "kit", "kind", "status", "origin") if g(k)}
+        if eq.get("kit", "").casefold() == "none":
+            eq["kit"] = "__none__"  # loose sounds: not part of any kit
         try:
             bmin = float(g("bpm_min")) if g("bpm_min") else None
             bmax = float(g("bpm_max")) if g("bpm_max") else None
@@ -578,3 +584,42 @@ def _is_unknown(sort: str, it: dict, st: Store) -> bool:
     if sort == "duration":
         return not (it.get("audio") or {}).get("duration_s")
     return False
+
+
+def scan_summary(st: "Store") -> dict:
+    """Counts the Scan screen can show before any plan exists."""
+    inc = [i for i in st.items if i["origin"] == "incoming"]
+    by_hash: dict = {}
+    for i in st.items:
+        if i.get("sha256"):
+            by_hash.setdefault(i["sha256"], []).append(i)
+    dup_groups = [g for g in by_hash.values()
+                  if len(g) > 1 and any(x["origin"] == "incoming" for x in g)]
+    lib_names: dict = {}
+    for i in st.items:
+        if i["origin"] == "library":
+            lib_names.setdefault(i["name"].casefold(), set()).add(i.get("sha256"))
+    # Estimate before a plan exists: an incoming file needs a renamed destination when its
+    # name clashes with a library file of different content. Exact duplicates are kept in
+    # place instead of renamed, so they are not counted.
+    collisions = sum(1 for i in inc if i["name"].casefold() in lib_names
+                     and i.get("sha256") not in lib_names[i["name"].casefold()]
+                     and len(by_hash.get(i.get("sha256"), ())) <= 1)
+    statuses: dict = {}
+    for i in inc:
+        s = st.review_status(i)
+        statuses[s] = statuses.get(s, 0) + 1
+    return {
+        "files": len(inc), "bytes": sum(i["size"] for i in inc),
+        "audio": sum(1 for i in inc if i["kind"] == "audio"),
+        "packs": len({i.get("pack") for i in inc if i.get("pack")}),
+        "kits": len(st.kits),
+        "library_files": sum(1 for i in st.items if i["origin"] == "library"),
+        "duplicate_groups": len(dup_groups),
+        "unknown_formats": sum(1 for i in inc if i["kind"] == "other"),
+        "unreadable": sum(1 for i in inc if i.get("hash_error")),
+        "collisions": ((st.plan or {}).get("summary") or {}).get("collisions", collisions)
+                      if st.plan and not st.plan_stale else collisions,
+        "needs_review": statuses.get("needs-review", 0),
+        "held": statuses.get("held", 0),
+    }

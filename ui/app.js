@@ -42,7 +42,11 @@ const Shell = {
     this.renderStatus(p);
     Scan.renderProgress(p);
     if (p.running) this.lastJob = p.job;
-    if (this.lastRunning && !p.running) {
+    // A fast job can start and finish between two polls; the server's job counter catches that.
+    const missedJob = this.lastSeq !== undefined && p.seq !== undefined && p.seq !== this.lastSeq && !p.running;
+    if (missedJob) this.lastJob = p.job;
+    this.lastSeq = p.seq;
+    if ((this.lastRunning || missedJob) && !p.running) {
       const job = this.lastJob;
       await App.refreshState();
       await App.refreshFacets();
@@ -211,7 +215,8 @@ const MoveLog = {
         <div class="vstat ${unresolved.length ? 'is-bad' : 'is-good'}"><span class="card-v mono">${Fmt.num(unresolved.length)}</span><span class="card-k">unresolved items</span></div>
       </div>
       <div class="rs-chips">${Object.entries(rs).map(([k, n]) => `<button type="button" class="rs rs-${esc(k)}" data-s="${esc(k)}">${esc(LOG_STATUS[k] || k)} <b class="mono">${Fmt.num(n)}</b></button>`).join('')}</div>
-      ${other.length ? `<dl class="vlist">${other.map(([k, val]) => `<dt>${esc(k.replace(/_/g, ' '))}</dt><dd class="mono">${fmtV(k, val)}</dd>`).join('')}</dl>` : ''}
+      ${v.unique_hashes !== undefined ? `<p class="dim vsum">${Fmt.num(v.unique_hashes)} unique files stored as ${Fmt.num(v.physical_files)} physical files across ${Fmt.num(v.library_paths)} library paths${v.kits_checked !== undefined ? ` · ${Fmt.num(v.kits_checked)} kits checked, ${Fmt.num(v.kits_incomplete ? v.kits_incomplete.length : 0)} incomplete` : ''}.</p>` : ''}
+      ${other.length ? `<details class="raw"><summary>All verification details</summary><dl class="vlist">${other.map(([k, val]) => `<dt>${esc(k.replace(/_/g, ' '))}</dt><dd class="mono">${fmtV(k, val)}</dd>`).join('')}</dl></details>` : ''}
       ${unresolved.length ? `<details class="raw"><summary>Unresolved paths (${unresolved.length})</summary><ul class="unres">${unresolved.map((u) => `<li><code class="ellip" title="${esc(typeof u === 'string' ? u : JSON.stringify(u))}">${esc(typeof u === 'string' ? u : (u.path || JSON.stringify(u)))}</code></li>`).join('')}</ul></details>` : ''}`;
     $$('#verify .rs-chips [data-s]').forEach((b) => b.addEventListener('click', () => { const r = $(`#log-status [data-s="${b.dataset.s}"]`); if (r) r.click(); }));
     const reps = Object.entries(ex.reports || {});
