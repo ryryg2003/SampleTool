@@ -60,6 +60,26 @@ App state (scan cache, edits, plan, approval, journal) lives in
 
 ## Tests
 
-`run_tests.bat` (Windows) or `python tests/run_all.py` runs the unit and
-end-to-end suites against disposable synthetic fixtures.
-`tests/WINDOWS_MANUAL_CHECKS.md` lists the checks that need real NTFS.
+`run_tests.bat` (Windows) or `python tests/run_all.py` runs 89 unit,
+end-to-end and Windows/NTFS tests against disposable synthetic fixtures.
+Every push runs them on GitHub Actions on Windows and Linux (Python 3.10 and
+3.13), plus the UI smoke test and a full scan-to-run flow through the UI in
+Chromium (`tests/ui_smoke.js`, `tests/ui_flow.js`). Screenshots from each run
+are attached to the workflow as artifacts.
+`tests/WINDOWS_MANUAL_CHECKS.md` lists the checks worth repeating on your own PC.
+
+## Known limits
+
+- Browser preview plays WAV, MP3, OGG/Opus, FLAC and M4A. AIFF and REX show
+  "Preview not supported" with a Reveal in Explorer button.
+- Project reference checks parse Ableton `.als` files. FL Studio `.flp` and
+  other project formats keep their relative layout but their sample references
+  are not parsed; the kit panel says "Not checked" for these.
+- Near-duplicates (same sound, different bytes) are reported, never merged.
+- A flat folder holding several kits as loose files is not split into kits
+  automatically; use **Create kit** from selected samples.
+
+## Roadmap
+
+`docs/FREE_SOUNDS_ADDON.md`: research and proposal for searching Freesound
+(CC0-licensed sounds) from inside the app.

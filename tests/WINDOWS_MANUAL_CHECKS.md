@@ -1,7 +1,16 @@
 # Windows / NTFS manual checks
 
-Things the automated suite cannot prove on Linux. Run them on the real Windows
-machine, **only against a disposable fixture** in `%TEMP%\SampleOrganizerTest`.
+**Now automated on real Windows/NTFS** (`tests/test_windows.py`, run by GitHub
+Actions on `windows-latest` with Python 3.10 and 3.13, plus `tests/ui_flow.js`):
+case-insensitive collisions, exclusive and read-shared file locks, junctions not
+followed, hard-link identity (`st_ino`, `st_nlink`, `fsutil hardlink list`),
+paths over 260 characters, `Samples` excluded case-insensitively, and the full
+scan → edit → approve → run flow in the UI. The checks below are still useful on
+**your** PC (your drive, your antivirus, your DAW holding files open, the Edge
+app window), and are the ones CI cannot reproduce.
+
+Run them on the real Windows machine, **only against a disposable fixture** in
+`%TEMP%\SampleOrganizerTest`.
 Never point any of these commands at `E:\` or the real collection.
 
 All commands are PowerShell unless marked `cmd`. Run from the repo folder.
