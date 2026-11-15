@@ -171,6 +171,8 @@ class Store:
                 counts[h] = counts.get(h, 0) + 1
         self._dup_counts = counts
         self._hay = {}
+        for it in self.items:  # build the search index now so the first search is fast
+            self._haystack(it)
 
     def _invalidate_plan(self) -> None:
         self.gen += 1
@@ -233,7 +235,7 @@ class Store:
                 self.edits.setdefault(key, {}).update(clean)
                 self._apply_changes(it, clean)
                 out.append(it)
-            self._hay = {}
+                self._hay.pop(it["id"], None)
             self.save_edits()
             self._invalidate_plan()
             return out
