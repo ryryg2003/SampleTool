@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sample Library Organizer</title>
+<link rel="stylesheet" href="app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23262C33'/%3E%3Cpath d='M3 11V7M6 11V4M9 11V6M12 11V8' stroke='%23F0B43C' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2M7 12h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-review" viewBox="0 0 24 24"><path d="M5 6h9M5 11h9M5 16h5M15 16l2.2 2.2L21 14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-library" viewBox="0 0 24 24"><path d="M4 19V5M8 19V5M12 19l0-12M15.5 18.5l-2.5-12 3-.6 2.5 12z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-log" viewBox="0 0 24 24"><path d="M12 7v5l3 2M4 12a8 8 0 1 0 2.3-5.6M4 4v3h3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1" fill="currentColor"/></symbol>
+  <symbol id="i-loop" viewBox="0 0 24 24"><path d="M17 4l3 3-3 3M20 7H8a4 4 0 0 0-4 4M7 20l-3-3 3-3M4 17h12a4 4 0 0 0 4-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5 15V5a1 1 0 0 1 1-1h9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7a1.5 1.5 0 0 1 1.5-1.5h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 17.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M5 19l1-4L15.5 5.5a2 2 0 0 1 3 3L9 18z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15 15l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="app" id="app">
+  <nav class="rail" aria-label="Main sections">
+    <div class="brand" title="Sample Library Organizer">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span class="brand-name">Sample<br>Organizer</span>
+    </div>
+    <button class="rail-btn" data-view="scan" aria-label="Scan"><svg><use href="#i-scan"/></svg><span>Scan</span></button>
+    <button class="rail-btn" data-view="review" aria-label="Review"><svg><use href="#i-review"/></svg><span>Review</span><b class="rail-dot" id="rail-review-dot" hidden></b></button>
+    <button class="rail-btn" data-view="library" aria-label="Library"><svg><use href="#i-library"/></svg><span>Library</span></button>
+    <button class="rail-btn" data-view="log" aria-label="Move Log"><svg><use href="#i-log"/></svg><span>Move Log</span></button>
+    <div class="rail-foot">
+      <span class="fixture-flag" id="fixture-flag" hidden title="Fake data in memory. Nothing on disk is read or changed.">Fixture data</span>
+      <button class="rail-help" id="btn-keys" aria-label="Keyboard shortcuts">?</button>
+    </div>
+  </nav>
+
+  <main class="stage" id="stage">
+    <!-- ============ SCAN ============ -->
+    <section class="view view-scan" id="view-scan" aria-labelledby="scan-h" hidden>
+      <header class="view-head">
+        <h1 id="scan-h">Scan</h1>
+        <p class="view-sub">Read every file under your packs folder and work out what each sound is.</p>
+      </header>
+      <div class="scan-body">
+        <form class="scan-form panel" id="scan-form">
+          <label for="scan-root" class="field-label">Packs folder</label>
+          <div class="scan-row">
+            <input id="scan-root" class="input input-path" type="text" spellcheck="false" autocomplete="off">
+            <button class="btn btn-primary btn-big" id="scan-start" type="submit">Start read-only scan</button>
+            <button class="btn btn-danger" id="scan-cancel" type="button" hidden>Cancel scan</button>
+          </div>
+          <p class="scan-promise"><span class="lock" aria-hidden="true"></span><span>Scanning only reads. It never moves, renames, tags or writes anything inside this folder. Results are stored in the app's own data folder<span id="scan-datadir"></span>.</span></p>
+        </form>
+        <div class="panel scan-progress" id="scan-progress" hidden>
+          <div class="sp-top">
+            <span class="sp-phase" id="sp-phase">walking</span>
+            <span class="sp-count mono" id="sp-count">0 / 0</span>
+            <span class="sp-bytes mono" id="sp-bytes"></span>
+          </div>
+          <div class="meter" role="progressbar" aria-label="Scan progress" aria-valuemin="0" aria-valuemax="100" id="sp-meter"><i id="sp-bar"></i></div>
+          <div class="sp-current mono ellip" id="sp-current"></div>
+          <div class="sp-issues">
+            <span id="sp-warn" class="pill pill-warn">0 warnings</span>
+            <span id="sp-err" class="pill pill-err">0 errors</span>
+          </div>
+          <ul class="issue-list" id="sp-errors"></ul>
+        </div>
+        <div id="scan-summary"></div>
+      </div>
+    </section>
+
+    <!-- ============ REVIEW ============ -->
+    <section class="view view-review" id="view-review" aria-labelledby="review-h" hidden>
+      <header class="view-head review-head">
+        <div>
+          <h1 id="review-h">Review plan</h1>
+          <p class="view-sub" id="plan-meta">No plan yet.</p>
+        </div>
+        <div class="head-actions">
+          <span class="plan-state" id="plan-state"></span>
+          <button class="btn" id="plan-build">Build plan</button>
+          <button class="btn btn-primary" id="plan-approve-open" disabled>Approve plan…</button>
+          <button class="btn btn-go" id="plan-run" disabled>Run approved plan</button>
+        </div>
+      </header>
+      <div class="banner banner-stale" id="stale-banner" role="alert" hidden>
+        <strong>Plan is out of date.</strong> <span id="stale-text">You changed metadata, kits or exclusions after this plan was built, so its approval was cleared.</span>
+        <button class="btn btn-small" id="stale-rebuild">Rebuild plan</button>
+      </div>
+      <div class="cards" id="plan-cards"></div>
+      <div class="tabs" role="tablist" aria-label="Review sections">
+        <button class="tab" role="tab" id="rtab-ops" aria-selected="true" aria-controls="rpane-ops">Operations</button>
+        <button class="tab" role="tab" id="rtab-kits" aria-selected="false" aria-controls="rpane-kits">Kits <span class="tab-n" id="rtab-kits-n"></span></button>
+      </div>
+      <div class="rpane" id="rpane-ops" role="tabpanel" aria-labelledby="rtab-ops">
+        <div class="toolbar">
+          <div class="seg" role="radiogroup" aria-label="Group operations by" id="op-group">
+            <span class="seg-label">Group</span>
+            <button role="radio" data-g="pack" aria-checked="true">Pack</button>
+            <button role="radio" data-g="kit" aria-checked="false">Kit</button>
+            <button role="radio" data-g="category" aria-checked="false">Category</button>
+            <button role="radio" data-g="action" aria-checked="false">Action</button>
+            <button role="radio" data-g="warning" aria-checked="false">Flag</button>
+          </div>
+          <select class="input" id="op-action" aria-label="Filter by action">
+            <option value="">All actions</option><option value="move">Move</option><option value="link">Link</option><option value="keep">Keep</option><option value="hold">Hold</option><option value="exclude">Exclude</option>
+          </select>
+          <select class="input" id="op-flag" aria-label="Filter by flag">
+            <option value="">Any flag</option><option value="duplicate">Duplicate</option><option value="name-collision">Name collision</option><option value="low-confidence">Low confidence</option><option value="unknown-category">Unknown category</option><option value="kit-held">Kit held</option><option value="warning">Has warning</option>
+          </select>
+          <div class="search search-sm"><svg aria-hidden="true"><use href="#i-search"/></svg><input class="input" id="op-q" type="search" placeholder="Filter operations" aria-label="Search operations"></div>
+          <span class="count mono" id="op-count"></span>
+        </div>
+        <div class="split">
+          <div class="vt" id="op-table"></div>
+          <aside class="op-detail panel" id="op-detail" aria-label="Operation details" hidden></aside>
+        </div>
+      </div>
+      <div class="rpane rpane-kits" id="rpane-kits" role="tabpanel" aria-labelledby="rtab-kits" hidden>
+        <div class="kits-list">
+          <div class="search search-sm"><svg aria-hidden="true"><use href="#i-search"/></svg><input class="input" id="kit-q" type="search" placeholder="Find kit" aria-label="Search kits"></div>
+          <ul id="kit-list" class="list" role="listbox" aria-label="Kits"></ul>
+          <p class="hint">To make a new kit, select samples in Library and choose <em>Create kit</em>.</p>
+        </div>
+        <div class="kit-detail panel" id="kit-detail"></div>
+      </div>
+    </section>
+
+    <!-- ============ LIBRARY ============ -->
+    <section class="view view-library" id="view-library" aria-labelledby="lib-h" hidden>
+      <aside class="packs" aria-label="Packs">
+        <div class="packs-head">
+          <h2 class="side-h">Packs <span class="mono dim" id="pack-n"></span></h2>
+          <div class="search search-sm"><svg aria-hidden="true"><use href="#i-search"/></svg><input class="input" id="pack-q" type="search" placeholder="Pack or maker" aria-label="Search packs by name or manufacturer"></div>
+        </div>
+        <ul class="pack-list" id="pack-list" role="listbox" aria-label="Packs"></ul>
+      </aside>
+
+      <div class="lib-main">
+        <header class="lib-head">
+          <div class="lib-title">
+            <h1 id="lib-h">Full library</h1>
+            <span class="lib-sub" id="lib-sub"></span>
+          </div>
+          <div class="tabs tabs-inline" role="tablist" aria-label="Pack contents" id="lib-tabs" hidden>
+            <button class="tab" role="tab" id="ltab-sounds" aria-selected="true" aria-controls="lib-sounds">Sounds</button>
+            <button class="tab" role="tab" id="ltab-kits" aria-selected="false" aria-controls="lib-kits">Kits <span class="tab-n" id="ltab-kits-n"></span></button>
+          </div>
+        </header>
+        <div id="lib-sounds" class="lib-sounds" role="tabpanel">
+          <div class="lib-search">
+            <div class="search search-lg"><svg aria-hidden="true"><use href="#i-search"/></svg><input class="input" id="lib-q" type="search" placeholder="Search name, pack, maker, instrument, kit, BPM, key, genre, tags" aria-label="Search samples" autocomplete="off" spellcheck="false"><kbd>/</kbd></div>
+          </div>
+          <div class="filters" id="lib-filters" aria-label="Filters">
+            <select class="input" data-f="category" aria-label="Category"><option value="">Category</option></select>
+            <select class="input" data-f="instrument" aria-label="Instrument"><option value="">Instrument</option></select>
+            <select class="input" data-f="loop_type" aria-label="Loop type"><option value="">Loop / one-shot</option></select>
+            <select class="input" data-f="key" aria-label="Key"><option value="">Key</option></select>
+            <select class="input" data-f="genre" aria-label="Genre"><option value="">Genre</option></select>
+            <select class="input" data-f="manufacturer" aria-label="Manufacturer"><option value="">Maker</option></select>
+            <span class="bpm-range"><input class="input mono" data-f="bpm_min" type="number" min="0" max="999" placeholder="BPM" aria-label="Minimum BPM"><span aria-hidden="true">–</span><input class="input mono" data-f="bpm_max" type="number" min="0" max="999" placeholder="max" aria-label="Maximum BPM"></span>
+            <select class="input" data-f="status" aria-label="Review status"><option value="">Status</option><option value="ok">OK</option><option value="needs-review">Needs review</option><option value="edited">Edited</option><option value="held">Held</option><option value="excluded">Excluded</option><option value="done">Organized</option></select>
+          </div>
+          <div class="chips-row" id="lib-chips-row">
+            <div class="chips" id="lib-chips"></div>
+            <span class="count mono" id="lib-count"></span>
+            <label class="check check-sm" title="By default only audio, MIDI and presets are listed. Tick to include artwork, documents and other files."><input type="checkbox" id="lib-allfiles"> Show all files</label>
+            <button class="btn btn-small btn-ghost" id="lib-clear" hidden>Clear all filters</button>
+          </div>
+          <div class="vt" id="lib-table"></div>
+          <div class="selbar" id="selbar" hidden>
+            <span id="sel-n" class="mono"></span>
+            <button class="btn btn-small" id="sel-edit">Bulk edit…</button>
+            <button class="btn btn-small" id="sel-kit">Create kit…</button>
+            <button class="btn btn-small btn-ghost" id="sel-clear">Clear selection</button>
+          </div>
+        </div>
+        <div id="lib-kits" class="lib-kits" role="tabpanel" hidden></div>
+      </div>
+
+      <aside class="inspector" id="inspector" aria-label="Sample details"></aside>
+    </section>
+
+    <!-- ============ MOVE LOG ============ -->
+    <section class="view view-log" id="view-log" aria-labelledby="log-h" hidden>
+      <header class="view-head">
+        <h1 id="log-h">Move log</h1>
+        <p class="view-sub" id="log-meta">What happened to each file when the approved plan ran.</p>
+      </header>
+      <div class="log-top">
+        <div class="panel verify" id="verify"></div>
+        <div class="panel reports" id="reports"></div>
+      </div>
+      <div class="toolbar">
+        <div class="seg" role="radiogroup" aria-label="Filter by status" id="log-status">
+          <button role="radio" data-s="" aria-checked="true">All</button>
+          <button role="radio" data-s="done" aria-checked="false">Done</button>
+          <button role="radio" data-s="already-done" aria-checked="false">Already done</button>
+          <button role="radio" data-s="held" aria-checked="false">Held</button>
+          <button role="radio" data-s="failed" aria-checked="false">Failed</button>
+          <button role="radio" data-s="skipped" aria-checked="false">Skipped</button>
+        </div>
+        <div class="search search-sm"><svg aria-hidden="true"><use href="#i-search"/></svg><input class="input" id="log-q" type="search" placeholder="Filter by name, path or error" aria-label="Search move log"></div>
+        <span class="count mono" id="log-count"></span>
+      </div>
+      <div class="vt" id="log-table"></div>
+    </section>
+  </main>
+
+  <footer class="deck">
+    <div class="transport" id="transport" aria-label="Audition player">
+      <button class="tp-btn tp-play" id="tp-play" aria-label="Play" title="Play / stop (Space)"><svg><use href="#i-play"/></svg></button>
+      <button class="tp-btn tp-toggle" id="tp-loop" aria-label="Loop" aria-pressed="false" title="Loop (L)"><svg><use href="#i-loop"/></svg></button>
+      <div class="tp-readout" aria-live="off">
+        <span class="tp-time mono" id="tp-time">0:00.0</span>
+        <span class="tp-dur mono" id="tp-dur">/ 0:00.0</span>
+      </div>
+      <div class="tp-track">
+        <div class="tp-name ellip" id="tp-name">Nothing loaded</div>
+        <input type="range" class="scrub" id="tp-scrub" min="0" max="1000" value="0" step="1" aria-label="Playback position" disabled>
+      </div>
+      <div class="tp-msg" id="tp-msg" role="status"></div>
+      <label class="tp-auto" title="Play each sample as you move with the arrow keys"><input type="checkbox" id="tp-auto"> Auto-play on arrows</label>
+      <div class="tp-vol"><svg aria-hidden="true"><use href="#i-vol"/></svg><input type="range" id="tp-vol" min="0" max="100" value="80" aria-label="Volume"></div>
+      <audio id="audio" preload="none"></audio>
+    </div>
+    <div class="statusbar" id="statusbar" role="status" aria-live="polite">
+      <span class="sb-led" id="sb-led" aria-hidden="true"></span>
+      <span class="sb-job" id="sb-job">Idle</span>
+      <span class="sb-count mono" id="sb-count"></span>
+      <span class="sb-sep"></span>
+      <span class="sb-warn" id="sb-warn"></span>
+      <span class="sb-err" id="sb-err"></span>
+      <span class="sb-plan" id="sb-plan"></span>
+    </div>
+  </footer>
+</div>
+
+<dialog class="dlg" id="approve-dlg" aria-labelledby="approve-h">
+  <form method="dialog" class="dlg-body" id="approve-form">
+    <h2 id="approve-h">Approve plan <span class="mono" id="approve-hash"></span></h2>
+    <p>Approving lets this exact plan run. Nothing happens until you press <em>Run approved plan</em> afterwards. If anything changes, approval is cleared.</p>
+    <table class="dlg-table" id="approve-table"></table>
+    <div class="dlg-err" id="approve-err" role="alert" hidden></div>
+    <label class="check"><input type="checkbox" id="approve-check"> I reviewed this plan</label>
+    <div class="dlg-actions">
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn btn-primary" id="approve-go" type="button" disabled>Approve plan</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="run-dlg" aria-labelledby="run-h">
+  <form method="dialog" class="dlg-body">
+    <h2 id="run-h">Run approved plan <span class="mono" id="run-hash"></span></h2>
+    <p id="run-text"></p>
+    <div class="dlg-err" id="run-err" role="alert" hidden></div>
+    <div class="dlg-actions">
+      <button class="btn" value="cancel">Cancel</button>
+      <button class="btn btn-go" id="run-go" type="button">Run plan now</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="bulk-dlg" aria-labelledby="bulk-h">
+  <form method="dialog" class="dlg-body" id="bulk-form">
+    <h2 id="bulk-h">Edit <span id="bulk-n"></span></h2>
+    <p class="dim">Tick the fields to change. Unticked fields keep each sample's own value. A ticked empty field sets the value to unknown.</p>
+    <div class="bulk-grid" id="bulk-grid"></div>
+    <div class="dlg-err" id="bulk-err" role="alert" hidden></div>
+    <div class="dlg-actions">
+      <button class="btn" value="cancel">Cancel</button>
+      <button class="btn btn-primary" id="bulk-go" type="button">Apply changes</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="kitnew-dlg" aria-labelledby="kitnew-h">
+  <form method="dialog" class="dlg-body" id="kitnew-form">
+    <h2 id="kitnew-h">Create kit from <span id="kitnew-n"></span></h2>
+    <label class="field-label" for="kitnew-name">Kit name</label>
+    <input class="input" id="kitnew-name" type="text" required>
+    <div class="dlg-err" id="kitnew-err" role="alert" hidden></div>
+    <div class="dlg-actions">
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn btn-primary" id="kitnew-go" type="button">Create kit</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="keys-dlg" aria-labelledby="keys-h">
+  <form method="dialog" class="dlg-body">
+    <h2 id="keys-h">Keyboard</h2>
+    <dl class="keys">
+      <dt><kbd>/</kbd></dt><dd>Search</dd>
+      <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Move through samples</dd>
+      <dt><kbd>Space</kbd></dt><dd>Play / stop</dd>
+      <dt><kbd>Enter</kbd></dt><dd>Play from start</dd>
+      <dt><kbd>L</kbd></dt><dd>Loop on / off</dd>
+      <dt><kbd>A</kbd></dt><dd>Auto-play on arrows</dd>
+      <dt><kbd>Ctrl</kbd>+<kbd>A</kbd></dt><dd>Select all results</dd>
+      <dt><kbd>Ctrl</kbd>/<kbd>Shift</kbd>+click</dt><dd>Add to / extend selection</dd>
+      <dt><kbd>E</kbd></dt><dd>Edit selection</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Clear selection, close panels</dd>
+    </dl>
+    <div class="dlg-actions"><button class="btn">Close</button></div>
+  </form>
+</dialog>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="fixtures.js"></script>
+<script src="core.js"></script>
+<script src="vtable.js"></script>
+<script src="library.js"></script>
+<script src="review.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
