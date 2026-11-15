@@ -228,7 +228,7 @@ def op_id(action: str, item: str, dest: Optional[str]) -> str:
 def plan_hash(ops: list) -> str:
     """Hash of the executable content of a plan. Any change to any op changes it."""
     keys = ("id", "action", "item_id", "source", "dest", "link_to", "depends_on",
-            "sha256", "size", "kit_id")
+            "sha256", "size", "mtime_ns", "kit_id")
     canon = [{k: o.get(k) for k in keys} for o in ops]
     return hashlib.sha256(json.dumps(canon, sort_keys=True).encode()).hexdigest()
 

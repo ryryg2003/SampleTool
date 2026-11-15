@@ -37,6 +37,7 @@ class App:
                                "total": 0, "bytes_done": 0, "bytes_total": 0, "current": "",
                                "warnings": 0, "errors": [], "message": ""}
         self._plock = threading.Lock()
+        self.executing = False  # true for the whole approved run incl. reports
 
     # ------------------------------------------------------------ progress
     def set_progress(self, p: dict) -> None:
@@ -79,13 +80,16 @@ class App:
 
         threading.Thread(target=run, name=f"job-{name}", daemon=True).start()
 
-    def job_scan(self) -> None:
+    def job_scan(self, new_root: Optional[str] = None) -> None:
         from . import classify, inventory, kits
         st = self.store
+        if new_root:  # switched only while holding the job lock
+            st.set_root(new_root)
         root = st.root
+        dest_root = st.dest_root
         if not root or not os.path.isdir(root):
             raise FileNotFoundError(f"Folder not found: {root}")
-        res = inventory.scan(root, st.dest_root, self.set_progress, dict(st.hash_cache), self.cancel)
+        res = inventory.scan(root, dest_root, self.set_progress, dict(st.hash_cache), self.cancel)
         if self.cancel.is_set():
             return
         items = res["items"]
@@ -99,7 +103,10 @@ class App:
             return
         self.set_progress({"job": "scan", "phase": "kits", "message": "Detecting complete kits"})
         kit_list = kits.detect_kits(items)
-        st.set_scan_result(items, kit_list, res.get("hash_cache", {}))
+        with st.lock:
+            if os.path.normcase(st.root) != os.path.normcase(root):
+                raise RuntimeError("The collection folder changed during the scan; results discarded.")
+            st.set_scan_result(items, kit_list, res.get("hash_cache", {}))
         self.skipped = res.get("skipped", [])
         n_in = sum(1 for i in items if i["origin"] == "incoming")
         self.set_progress({"job": "scan", "message":
@@ -110,12 +117,22 @@ class App:
         st = self.store
         self.set_progress({"job": "plan", "phase": "planning", "message": "Building plan"})
         with st.lock:
-            gen = st.gen
+            gen, root = st.gen, st.root
             plan = planner.build_plan(st.items, st.kits, st.root, st.dest_root)
-        st.set_plan(plan, gen)
+        with st.lock:
+            if os.path.normcase(st.root) != os.path.normcase(root):
+                raise RuntimeError("The collection folder changed while planning; plan discarded.")
+            st.set_plan(plan, gen)
         self.set_progress({"job": "plan", "message": f"Plan ready: {len(plan['ops'])} operations. Review, then approve."})
 
     def job_execute(self, plan_hash: str) -> None:
+        self.executing = True
+        try:
+            self._job_execute(plan_hash)
+        finally:
+            self.executing = False
+
+    def _job_execute(self, plan_hash: str) -> None:
         from . import executor, export
         st = self.store
         with st.lock:
@@ -131,7 +148,7 @@ class App:
             self.set_progress({"message": "Run paused. Run the approved plan again to resume; completed operations will not repeat."})
             return
         self.set_progress({"job": "export", "phase": "reports", "message": "Writing catalog reports"})
-        catalog_dir = os.path.join(st.dest_root, models.CATALOG_DIR)
+        catalog_dir = os.path.join(plan["dest_root"], models.CATALOG_DIR)  # the approved destination
         with st.lock:
             ex["reports"] = export.write_reports(catalog_dir, st.items, st.kits, plan, results)
             self.set_progress({"phase": "verifying", "message": "Verifying library"})
@@ -447,28 +464,32 @@ class Handler(BaseHTTPRequestHandler):
         lim = min(1000, max(1, int(q.get("limit") or 200)))
         return self._send(200, {"total": len(out), "items": out[off:off + lim]})
 
+    MUTATING = {"/api/scan", "/api/items/edit", "/api/kits/edit", "/api/kits/create",
+                "/api/plan/build", "/api/plan/approve", "/api/execute"}
+
     def _api_post(self, path: str, b: dict):
         app, st = self.app, self.app.store
+        if path in self.MUTATING and (app.executing or (app.progress.get("running") and
+                                                        app.progress.get("job") in ("execute", "export"))):
+            raise RuntimeError("Changes are locked while the approved plan is running.")
+        if path == "/api/scan" and app.progress.get("running"):
+            raise RuntimeError(f"Another task is running ({app.progress.get('job')}). Wait for it or cancel it.")
         if path == "/api/scan":
+            root = None
             if b.get("root"):
                 root = os.path.abspath(str(b["root"]).strip().strip('"'))
                 if not os.path.isdir(root):
                     raise ValueError(f"Folder not found: {root}")
-                st.set_root(root)
-            app.start_job("scan", app.job_scan)
+            app.start_job("scan", lambda: app.job_scan(root))
             return self._send(200, {"ok": True})
         if path == "/api/cancel":
             app.cancel.set()
             return self._send(200, {"ok": True})
         if path == "/api/items/edit":
-            if app.progress.get("running") and app.progress.get("job") == "execute":
-                raise RuntimeError("Edits are locked while the approved plan is running.")
             items = st.edit_items(list(b.get("ids") or []), dict(b.get("changes") or {}))
             prop = self._propose()
             return self._send(200, {"ok": True, "updated": len(items), "items": [st.row(i, prop) for i in items]})
         if path == "/api/kits/edit":
-            if app.progress.get("running") and app.progress.get("job") == "execute":
-                raise RuntimeError("Edits are locked while the approved plan is running.")
             kit = st.edit_kit(b)
             return self._send(200, {"ok": True, "kit": kit})
         if path == "/api/kits/create":

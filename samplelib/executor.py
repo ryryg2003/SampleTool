@@ -142,6 +142,27 @@ def _check_dest_ancestors(dest: str, dest_root: str | None) -> str | None:
     return None
 
 
+def _check_source_ancestors(src: str, root: str | None, dest_root: str | None) -> str | None:
+    """Refuse a source outside root, inside the library, or below a reparse point."""
+    if not root:
+        return "plan has no collection root; cannot verify source location"
+    if not is_within(src, root):
+        return f"source is outside the collection folder {root}"
+    if dest_root and is_within(src, dest_root):
+        return "source is already inside the library folder"
+    cur = os.path.dirname(os.path.abspath(src))
+    root_key = path_key(root)
+    while True:
+        if os.path.lexists(long_path(cur)) and is_reparse_point(cur):
+            return f"source folder {cur} is a reparse point (junction/symlink)"
+        if path_key(cur) == root_key:
+            return None
+        nxt = os.path.dirname(cur)
+        if nxt == cur:
+            return f"source is outside the collection folder {root}"
+        cur = nxt
+
+
 def _partial_path(dest: str, opid: str) -> str:
     return f"{dest}.partial-{opid}"
 
@@ -177,6 +198,19 @@ class _Journal:
     def __init__(self, path: str):
         d = os.path.dirname(os.path.abspath(path))
         os.makedirs(d, exist_ok=True)
+        # A crash mid-write can leave a torn final line. Terminate it so the next
+        # record is not glued onto the fragment (read_journal skips the fragment).
+        try:
+            with open(path, "rb+") as g:
+                g.seek(0, os.SEEK_END)
+                if g.tell() > 0:
+                    g.seek(-1, os.SEEK_END)
+                    if g.read(1) != b"\n":
+                        g.write(b"\n")
+                        g.flush()
+                        os.fsync(g.fileno())
+        except FileNotFoundError:
+            pass
         self.f = open(path, "a", encoding="utf-8")
 
     def write(self, op_id: str, phase: str, **fields) -> None:
@@ -309,7 +343,9 @@ def _staged_move(op: dict, j: _Journal) -> dict:
     src, dest, opid, sha = op["source"], op["dest"], op["id"], op["sha256"]
     partial = _partial_path(dest, opid)
     if os.path.lexists(long_path(partial)):
-        _unlink(partial)
+        # Only reconcile (which runs when the journal shows this op started) may
+        # remove a leftover staging file. Anything else is left alone.
+        raise _Held(f"a staging file already exists and was not created by this run: {partial}")
     _copy(src, partial)
     try:
         if _hash(partial) != sha:
@@ -520,6 +556,10 @@ def execute(plan: dict, journal_path: str, progress, cancel=None) -> list[dict]:
                     resume = prior.get(opid) == "start"
                     try:
                         if action == "move":
+                            bad = _check_source_ancestors(op.get("source") or "",
+                                                          plan.get("root"), dest_root)
+                            if bad:
+                                raise _Held(bad)
                             r = _do_move(op, journal, dest_root, resume)
                         else:
                             r = _do_link(op, journal, dest_root, resume)

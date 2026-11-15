@@ -66,7 +66,9 @@ class Store:
         return os.path.join(self.root, models.DEST_DIRNAME)
 
     def journal_path(self, plan_hash: str) -> str:
-        return self._p(f"journal-{plan_hash[:16]}.jsonl")
+        import hashlib
+        rk = hashlib.sha1(os.path.normcase(self.root).encode("utf-8")).hexdigest()[:8]
+        return self._p(f"journal-{rk}-{plan_hash[:32]}.jsonl")
 
     # ------------------------------------------------------------ persistence
     def _read_json(self, name: str, default: Any) -> Any:
@@ -121,13 +123,23 @@ class Store:
 
     # -------------------------------------------------------------- inventory
     def set_root(self, root: str) -> None:
+        """Switch collections. Caller must hold no running job (server enforces)."""
         with self.lock:
             if os.path.normcase(root) != os.path.normcase(self.root):
+                self._invalidate_plan()
+                for name in ("plan.json.gz", "approval.json", "execution.json.gz",
+                             "inventory.json.gz"):
+                    try:
+                        os.remove(self._p(name))
+                    except OSError:
+                        pass
                 self.root = root
                 self.save_settings()
                 self.items, self.kits, self.plan, self.execution = [], [], None, None
                 self.by_id, self.kit_by_id = {}, {}
+                self._final_paths = {}
                 self.approved_hash = None
+                self.plan_stale = False
 
     def _set_inventory(self, items: list, kits: list, persist: bool = True) -> None:
         """items/kits are the detector's output (pre manual edits)."""
@@ -236,8 +248,8 @@ class Store:
                 self._apply_changes(it, clean)
                 out.append(it)
                 self._hay.pop(it["id"], None)
-            self.save_edits()
             self._invalidate_plan()
+            self.save_edits()
             return out
 
     # ------------------------------------------------------------------- kits
@@ -325,9 +337,9 @@ class Store:
         with self.lock:
             if e.get("action") != "create" and e.get("kit_id") not in self.kit_by_id:
                 raise KeyError("Unknown kit")
+            self._invalidate_plan()
             kit = self._apply_kit_edit(dict(e))
             self.save_edits()
-            self._invalidate_plan()
             self._hay = {}
             return kit if kit.get("id") in self.kit_by_id else None
 
