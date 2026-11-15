@@ -182,7 +182,9 @@ def reveal_in_explorer(p: str) -> None:
             if os.path.isdir(target) and target != p:
                 cmd = ["explorer", os.path.normpath(target)]
             else:
-                cmd = ["explorer", "/select,", os.path.normpath(target)]
+                # Explorer parses its own command line: it wants /select,"path"
+                # with no space. Windows paths cannot contain '"', so this is safe.
+                cmd = 'explorer /select,"%s"' % os.path.normpath(target)
             subprocess.Popen(cmd, close_fds=True)
         elif sys.platform == "darwin":
             subprocess.Popen(["open", "-R", target], close_fds=True)

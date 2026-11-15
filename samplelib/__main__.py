@@ -48,6 +48,11 @@ def main(argv=None) -> int:
     ap.add_argument("--data-dir", default=default_data_dir())
     ap.add_argument("--no-browser", action="store_true")
     a = ap.parse_args(argv)
+    for stream in (sys.stdout, sys.stderr):  # never crash on non-ASCII paths in a cp1252 console
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
 
     if sys.version_info < (3, 10):
         print("Python 3.10 or newer is required.")
