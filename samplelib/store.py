@@ -475,6 +475,11 @@ class Store:
                         cur = self.review_status(it)
                     else:
                         cur = self._mv(it, k)
+                    if k == "kind" and "," in v:
+                        if (cur or "") not in {x.strip() for x in v.split(",")}:
+                            ok = False
+                            break
+                        continue
                     if v == "__none__":
                         if cur not in (None, ""):
                             ok = False
