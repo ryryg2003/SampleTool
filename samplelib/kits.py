@@ -200,7 +200,11 @@ def _is_container(tree, d):
     if _name_match(name) and len(_audio(tree.files.get(d, []))) < 2:
         kids = [c for c in tree.children.get(d, ())
                 if len(_audio(tree.sub.get(c, []))) >= 2 and not _generic_child(d, c)]
-        if len(kids) >= 2:
+        # One distinctively named kit folder inside "Construction Kits" is enough:
+        # many packs ship a single kit in such a container. Generic children
+        # ("Stems", "MIDI") never count, so a kit-named folder holding only
+        # those is still the kit itself.
+        if len(kids) >= 1:
             return True
     kids = [c for c in sorted(tree.children.get(d, ())) if _kitlike(tree, c)]
     if len(kids) < 2:

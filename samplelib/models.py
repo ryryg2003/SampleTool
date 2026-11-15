@@ -40,7 +40,7 @@ UNSORTED = "Unsorted"  # category value when unknown; such items are HELD, not m
 Kind = Literal["audio", "midi", "project", "preset", "document", "image",
                "archive", "other"]
 
-AUDIO_EXTS = {".wav", ".aif", ".aiff", ".flac", ".mp3", ".ogg", ".m4a", ".wv", ".rex", ".rx2"}
+AUDIO_EXTS = {".wav", ".aif", ".aiff", ".aifc", ".opus", ".flac", ".mp3", ".ogg", ".m4a", ".wv", ".rex", ".rx2"}
 MIDI_EXTS = {".mid", ".midi"}
 PROJECT_EXTS = {".als", ".flp", ".logicx", ".ptx", ".cpr", ".rpp", ".song", ".bwproject", ".aup3", ".reason"}
 PRESET_EXTS = {".fxp", ".fxb", ".nmsv", ".vital", ".vitalbank", ".h2p", ".adg", ".adv", ".agr",
@@ -49,7 +49,7 @@ DOCUMENT_EXTS = {".pdf", ".txt", ".rtf", ".md", ".html", ".htm", ".nfo", ".doc",
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
 ARCHIVE_EXTS = {".zip", ".rar", ".7z", ".tar", ".gz"}
 # Formats the browser <audio> element plays natively in Edge/Chrome.
-BROWSER_PLAYABLE = {".wav", ".mp3", ".ogg", ".flac", ".m4a"}
+BROWSER_PLAYABLE = {".wav", ".mp3", ".ogg", ".opus", ".flac", ".m4a"}
 
 # Metadata provenance
 Source = Literal["tag", "filename", "folder", "inference", "analysis", "manual"]

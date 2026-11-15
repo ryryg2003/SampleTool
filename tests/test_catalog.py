@@ -483,6 +483,25 @@ class TestKits(unittest.TestCase):
         self.assertEqual(op["dest"], os.path.join(self.c.dest, "Complete Kits",
                                                   "Lofi Lab - Sunset 90 F#m", "Stems", "Kick.wav"))
 
+    def test_single_kit_inside_container(self):
+        base = "Nightfall Audio - Midnight Trap/Construction Kits"
+        for i, f in enumerate(("Stems/Kick.wav", "Stems/Bass.wav", "Stems/Melody.wav")):
+            self.c.add("%s/Midnight 140 Am/%s" % (base, f), uniq(100 + i))
+        self.c.add("%s/Midnight 140 Am/MIDI/Bass.mid" % base, b"m")
+        classify.enrich(self.c.items, None)
+        ks = kits.detect_kits(self.c.items)
+        self.assertEqual([k["name"] for k in ks], ["Midnight 140 Am"])
+        self.assertEqual(ks[0]["root_rel"], base + "/Midnight 140 Am")
+
+    def test_kit_folder_with_only_generic_children_is_the_kit(self):
+        base = "Maker - Pack/Construction Kit"
+        for i, f in enumerate(("Stems/Kick 140.wav", "Stems/Bass 140.wav", "Stems/Lead 140.wav")):
+            self.c.add("%s/%s" % (base, f), uniq(200 + i))
+        self.c.add(base + "/MIDI/Lead.mid", b"m")
+        classify.enrich(self.c.items, None)
+        ks = kits.detect_kits(self.c.items)
+        self.assertEqual([k["root_rel"] for k in ks], [base])
+
     def test_als_ref_checks(self):
         build_kit_collection(self.c, als_refs=["Night_Drums_140bpm_Am.wav",
                                                "../../One Shots/Kicks/Kick 01.wav",
