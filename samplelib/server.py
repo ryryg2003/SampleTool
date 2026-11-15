@@ -370,7 +370,7 @@ class Handler(BaseHTTPRequestHandler):
         st = self.app.store
         if not st.plan:
             return self._send(200, {"plan_hash": None, "stale": False, "approved": False,
-                                    "summary": None, "total": 0, "ops": []})
+                                    "summary": None, "total": 0, "ops": [], "items": []})
         ops = st.plan["ops"]
         action, flag, text = q.get("action"), q.get("flag"), (q.get("q") or "").casefold()
         kit, pack, cat = q.get("kit"), q.get("pack"), q.get("category")
@@ -408,7 +408,8 @@ class Handler(BaseHTTPRequestHandler):
             rows.append(r)
         return self._send(200, {"plan_hash": st.plan["plan_hash"], "stale": st.plan_stale,
                                 "approved": st.approved_hash == st.plan["plan_hash"],
-                                "summary": st.plan.get("summary"), "total": len(out), "ops": rows})
+                                "summary": st.plan.get("summary"), "total": len(out), "ops": rows,
+                                "items": rows})
 
     def _log(self, q: dict):
         st = self.app.store

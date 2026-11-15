@@ -137,7 +137,7 @@ edits survive rescans. Any edit marks the plan stale and clears approval.
 | POST | `/api/kits/edit` | `{kit_id, action: "hold"/"release"/"exclude"/"include"/"rename"/"remove_members"/"add_members"/"dissolve", name?, ids?}` | `{ok, kit}` |
 | POST | `/api/kits/create` | `{name, ids}` | `{ok, kit}` |
 | POST | `/api/plan/build` | | `{ok}` (job "plan"; poll progress) |
-| GET | `/api/plan` | `group(pack/kit/category/action/warning), action, flag, q, offset, limit` | `{plan_hash, stale, approved, summary, total, ops:[Operation + {name, pack, kit_name, rel_path}]}` |
+| GET | `/api/plan` | `group(pack/kit/category/action/warning), action, flag, q, offset, limit` | `{plan_hash, stale, approved, summary, total, ops:[Operation + {name, pack, kit_name, rel_path}], items: (same as ops)}` |
 | POST | `/api/plan/approve` | `{plan_hash}` | `{ok}` or 409 if hash != current or plan stale |
 | POST | `/api/execute` | `{plan_hash}` | `{ok}` or 409 unless approved & matching; job "execute" then "export" |
 | GET | `/api/log` | `status, q, offset, limit` | `{total, items:[OpResult + {name}] }` |
