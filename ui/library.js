@@ -79,7 +79,7 @@ const Library = {
         { key: 'pack', label: 'Pack', sort: 'pack', width: 'minmax(56px, .8fr)', cls: 'c-pack', title: (r) => r.pack || '', render: (r) => `<span class="ellip">${esc(r.pack ? shortPack(r.pack, r.manufacturer) : (r.origin === 'library' ? 'In library' : '—'))}</span>` },
         { key: 'inst', label: 'Instrument', width: 'minmax(84px, .95fr)', cls: 'c-inst', title: (r) => r.category || '', render: (r) => catTag(r.category, r.instrument || Fmt.catShort(r.category) || '—') },
         { key: 'bpm', label: 'BPM', sort: 'bpm', width: '44px', cls: 'num', render: (r) => estMark(r, 'bpm', Fmt.bpm(r.bpm)) },
-        { key: 'key', label: 'Key', sort: 'key', width: '42px', cls: 'c-key', render: (r) => estMark(r, 'key', r.key || '') },
+        { key: 'key', label: 'Key', sort: 'key', width: '42px', cls: 'c-key', render: (r) => (!r.key && r.no_key ? '<span class="dim nokey" title="Drums, FX and noise: no musical key">none</span>' : estMark(r, 'key', r.key || '')) },
         { key: 'bars', label: 'Bars', width: '38px', cls: 'num', render: (r) => r.bars ? `${esc(r.bars)}${r.on_grid === false ? '<span class="offgrid" title="Starts late: not on the downbeat">◂</span>' : ''}` : '' },
         { key: 'dur', label: 'Length', sort: 'duration', width: '50px', cls: 'num', render: (r) => r.duration_s ? Fmt.dur(r.duration_s) : '' },
         { key: 'size', label: 'Size', sort: 'size', width: '54px', cls: 'num', render: (r) => Fmt.bytes(r.size) },

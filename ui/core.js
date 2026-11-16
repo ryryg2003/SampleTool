@@ -53,7 +53,7 @@ function catSlug(c) { return CAT_SLUG[c] || 'fx'; }
 
 const STATUS_LABEL = { ok: 'OK', 'needs-review': 'Review', edited: 'Edited', held: 'Held', excluded: 'Excluded', done: 'Organized' };
 const ACTION_LABEL = { move: 'Move', link: 'Link', keep: 'Keep', hold: 'Hold', exclude: 'Exclude', unlink: 'Unlink' };
-const SOURCE_LABEL = { tag: 'Tag', filename: 'Filename', folder: 'Folder', inference: 'Inferred', analysis: 'Analysis', manual: 'Manual' };
+const SOURCE_LABEL = { tag: 'Tag', filename: 'Filename', folder: 'Folder', inference: 'Inferred', analysis: 'Analysis', manual: 'Manual', pack: 'From pack' };
 
 /* ---------------- Store (tiny localStorage wrapper) ---------------- */
 const Store = {

@@ -131,12 +131,14 @@ class ScanIntegrationTest(unittest.TestCase):
         self.items = inventory.scan(self.root, os.path.join(self.root, "Samples"), None)["items"]
         classify.enrich(self.items)
         self.calls = []
+        self.wants = {}
 
     def tearDown(self):
         shutil.rmtree(self.root, ignore_errors=True)
 
     def counting(self, path, ext, want=frozenset({"tempo", "key"})):
         self.calls.append(os.path.basename(path))
+        self.wants[os.path.basename(path)] = set(want)
         return analysis.analyze(path, ext, want)
 
     def get(self, name):
@@ -189,6 +191,8 @@ class ScanIntegrationTest(unittest.TestCase):
 
     def test_selection(self):
         self.run_it()
-        self.assertNotIn("Kick 01.wav", self.calls)
+        # drum one-shots are measured for loudness only (no tempo, key or pitch)
+        self.assertEqual(self.wants["Kick 01.wav"], {"loudness"})
+        self.assertIsNotNone(self.get("Kick 01.wav")["analysis"]["rms_db"])
         self.assertIn("808 Bass.wav", self.calls)
         self.assertEqual(self.get("808 Bass.wav")["analysis"]["key"], "A")

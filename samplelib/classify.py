@@ -387,7 +387,7 @@ def classify_item(item: dict) -> dict:
             if meta["genre"]["value"] is None:
                 gf = find_genre(pack_words)
                 if gf:
-                    meta["genre"] = field(gf, "folder", 0.5)
+                    meta["genre"] = field(gf, "pack", 0.5)
 
     if kind in ("midi", "preset"):
         meta["category"] = field("Presets & MIDI", "inference", 0.95)
@@ -662,6 +662,33 @@ def _prog(progress, **kw):
             pass
 
 
+# Drums, FX and noise rarely have a musical key. Below this confidence a
+# measured key is dropped and the sample is marked "no key" instead of guessed.
+NO_KEY_CONF = 0.7
+NO_KEY_CATEGORIES = {"One-Shots/Drums", "Loops/Drum Loops"}
+NO_KEY_INSTRUMENTS = {"fx", "riser", "impact", "sweep", "noise", "foley", "transition",
+                      "downlifter", "drone"}
+
+
+def wants_no_key(meta: dict) -> bool:
+    cat = (meta.get("category") or {}).get("value")
+    inst = (meta.get("instrument") or {}).get("value")
+    return cat in NO_KEY_CATEGORIES or inst in NO_KEY_INSTRUMENTS
+
+
+def apply_no_key(it: dict) -> None:
+    """Set it["no_key"]; drop a low-confidence measured key on drums/FX/noise."""
+    meta = it.get("meta") or {}
+    k = meta.get("key") or {}
+    it["no_key"] = False
+    if not wants_no_key(meta) or k.get("source") == "manual":
+        return
+    if k.get("value") and k.get("source") == "analysis" and (k.get("confidence") or 0) < NO_KEY_CONF:
+        meta["key"] = field(None, None, None)
+    if not meta["key"].get("value"):
+        it["no_key"] = True
+
+
 def _reclassify(it: dict) -> None:
     old = it.get("meta") or {}
     meta = classify_item(it)
@@ -669,6 +696,7 @@ def _reclassify(it: dict) -> None:
         if isinstance(old.get(k), dict) and old[k].get("source") == "manual":
             meta[k] = old[k]
     it["meta"] = meta
+    apply_no_key(it)
 
 
 def _analysis_want(it: dict):
@@ -681,7 +709,7 @@ def _analysis_want(it: dict):
     if lt == "one-shot":
         if cat in ("One-Shots/Bass & 808s", "One-Shots/Instruments"):
             return frozenset({"root"})
-        return None
+        return frozenset({"loudness"})
     if cat == "Loops/Drum Loops":
         return frozenset({"tempo"})
     return frozenset({"tempo", "key"})
@@ -709,6 +737,31 @@ def _mismatch_warnings(it: dict, want) -> list:
             out.append("%s %s, audio measures %s" % (_SAYS.get(k["source"], "Metadata says"),
                                                    k["value"], an["key"]))
     return out
+
+
+def spread_pack_genre(items: list) -> None:
+    """Genre never comes from audio. When at least 3 samples in a pack name the
+    same genre (tags, filename or folder) and they are 60%+ of the pack's
+    genre-labeled samples, the pack's other samples get it as "pack"."""
+    by_pack: dict = {}
+    for it in items:
+        if it.get("kind") == "audio" and it.get("pack"):
+            by_pack.setdefault(it["pack"], []).append(it)
+    for members in by_pack.values():
+        counts: dict = {}
+        for it in members:
+            g = (it.get("meta") or {}).get("genre") or {}
+            if g.get("value") and g.get("source") in ("tag", "filename", "folder", "manual"):
+                counts[g["value"]] = counts.get(g["value"], 0) + 1
+        if not counts:
+            continue
+        top, n = max(counts.items(), key=lambda t: (t[1], t[0]))
+        if n < 3 or n < 0.6 * sum(counts.values()):
+            continue
+        for it in members:
+            g = it["meta"].get("genre") or {}
+            if not g.get("value"):
+                it["meta"]["genre"] = field(top, "pack", 0.5)
 
 
 def analyze_items(items: list, cache: dict, progress=None, cancel=None,
@@ -745,6 +798,7 @@ def analyze_items(items: list, cache: dict, progress=None, cancel=None,
         _reclassify(it)
         ws = list(it.get("warnings") or [])
         it["warnings"] = ws + [w for w in _mismatch_warnings(it, want) if w not in ws]
+    spread_pack_genre(items)
     _prog(progress, phase="analyzing", done=len(todo), total=len(todo))
     return used
 
@@ -777,5 +831,6 @@ def enrich(items: list, progress=None, cancel=None) -> None:
                   current=it.get("rel_path", ""))
         _reclassify(it)
         it.setdefault("warnings", [])
+    spread_pack_genre(items)
     find_near_dupes(items)
     _prog(progress, phase="classifying", done=total, total=total)
