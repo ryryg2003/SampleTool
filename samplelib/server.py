@@ -136,18 +136,24 @@ class App:
         self.set_progress({"job": "scan", "message":
                            f"Scan finished: {n_in} files found, {len(kit_list)} kits. Nothing was changed."})
 
-    def job_plan(self) -> None:
+    def job_plan(self, only_new: bool = False) -> None:
         from . import planner
         st = self.store
-        self.set_progress({"job": "plan", "phase": "planning", "message": "Building plan"})
+        self.set_progress({"job": "plan", "phase": "planning", "message":
+                           "Building plan for new files only" if only_new else "Building plan"})
         with st.lock:
             gen, root = st.gen, st.root
+            # duplicate detection always sees every item (library + all incoming)
             plan = planner.build_plan(st.items, st.kits, st.root, st.dest_root)
+            if only_new:
+                from . import incremental
+                plan = incremental.restrict_plan_to_new(plan, st.items)
         with st.lock:
             if os.path.normcase(st.root) != os.path.normcase(root):
                 raise RuntimeError("The collection folder changed while planning; plan discarded.")
             st.set_plan(plan, gen)
-        self.set_progress({"job": "plan", "message": f"Plan ready: {len(plan['ops'])} operations. Review, then approve."})
+        extra = f" ({plan['summary'].get('new_files', 0)} new files; the rest are kept for a later plan)" if only_new else ""
+        self.set_progress({"job": "plan", "message": f"Plan ready: {len(plan['ops'])} operations{extra}. Review, then approve."})
 
     def job_execute(self, plan_hash: str) -> None:
         self.executing = True
@@ -177,7 +183,8 @@ class App:
         self.set_progress({"job": "export", "phase": "reports", "message": "Writing catalog reports"})
         catalog_dir = os.path.join(plan["dest_root"], models.CATALOG_DIR)  # the approved destination
         with st.lock:
-            ex["reports"] = export.write_reports(catalog_dir, st.items, st.kits, plan, results)
+            ex["reports"] = export.write_reports(catalog_dir, st.items, st.kits, plan, results,
+                                                 collections=getattr(st, "collections", None))
             self.set_progress({"phase": "verifying", "message": "Verifying library"})
             ex["verification"] = export.verify_library(st.items, st.kits, plan, results)
         st.set_execution(ex)
@@ -565,7 +572,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/plan/build":
             if not st.items:
                 raise ValueError("Run a scan first")
-            app.start_job("plan", app.job_plan)
+            only_new = bool(b.get("only_new"))
+            if only_new and not any(i.get("is_new") and i["origin"] == "incoming" for i in st.items):
+                raise ValueError("Nothing is new since the last run. Build a full plan instead.")
+            app.start_job("plan", (lambda: app.job_plan(only_new=True)) if only_new else app.job_plan)
             return self._send(200, {"ok": True})
         if path == "/api/plan/approve":
             st.approve(str(b.get("plan_hash") or ""))

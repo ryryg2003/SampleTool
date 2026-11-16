@@ -124,6 +124,63 @@ async function waitIdle(timeout = 60000) {
     //
     //
     // >>> collections checks (owned by the collections feature; insert between these lines)
+    {
+      const libRows = '#lib-table .vt-row:not(.is-ph)';
+      const count = async () => parseInt((await page.textContent('#lib-count')).replace(/[^\d]/g, ''), 10) || 0;
+      const filteredN = await count();
+      // star the current sample with S (Closed Hat 03 is selected)
+      await page.keyboard.press('s');
+      await sleep(600);
+      const favs = await api('/api/samples?fav=1&limit=50');
+      check('S stars the selected sample', favs.items.some((r) => r.name === 'Closed Hat 03.wav'), favs.items.map((r) => r.name).join('|'));
+      check('star shows in the table', (await page.locator(libRows).filter({ hasText: 'Closed Hat 03' }).first().locator('.ib.star.on').count()) === 1);
+      const favSide = parseInt(await page.textContent('#coll-list .ck[data-c="fav"] .ck-n'), 10);
+      check('sidebar Favorites count (identical copies included)', favSide === favs.total && favSide >= 1, `${favSide} vs ${favs.total}`);
+      // save the current search + filters + pack as a smart collection
+      await page.click('#lib-save-smart');
+      await page.waitForSelector('#coll-dlg[open]', { timeout: 5000 });
+      await page.fill('#coll-name', 'Nightfall hats');
+      await page.click('#coll-go');
+      await sleep(700);
+      const smart = (await api('/api/collections')).collections.find((c) => c.name === 'Nightfall hats');
+      check('smart collection saved with search, filter and pack', !!smart && smart.params.q === 'hat' && smart.params.category === 'One-Shots/Drums' && /^Nightfall/.test(smart.params.pack || ''), JSON.stringify(smart));
+      // create a collection and add the selected sample
+      await page.click('#ins-coll');
+      await page.waitForSelector('#coll-dlg[open]', { timeout: 5000 });
+      await page.selectOption('#coll-pick', '__new');
+      await page.fill('#coll-name', 'Trap drums');
+      await page.click('#coll-go');
+      await sleep(800);
+      const trap = (await api('/api/collections')).collections.find((c) => c.name === 'Trap drums');
+      check('collection created with the sample', !!trap && trap.count >= 1, JSON.stringify(trap));
+      const trapSide = trap && parseInt(await page.textContent(`#coll-list .ck[data-c="${trap.id}"] .ck-n`), 10);
+      check('sidebar shows collection count', !!trap && trapSide === trap.count, `${trapSide}`);
+      check('inspector lists the collection', /Trap drums/.test(await page.textContent('#inspector')));
+      // open the collection: whole collection, other filters reset
+      await page.click(`#coll-list .ck[data-c="${trap.id}"]`);
+      await sleep(700);
+      check('opening a collection filters the table', (await count()) === trap.count && (await page.inputValue('#lib-q')) === '', `${await count()}`);
+      await page.click('#lib-clear');
+      await sleep(500);
+      // reopen the smart collection: search + filter + pack come back
+      await page.click(`#coll-list .ck[data-c="${smart.id}"]`);
+      await sleep(900);
+      check('smart collection restores search', (await page.inputValue('#lib-q')) === 'hat');
+      check('smart collection restores filter', (await page.inputValue('#lib-filters [data-f="category"]')) === 'One-Shots/Drums');
+      check('smart collection restores pack', (await page.evaluate(() => Library.pack)) === smart.params.pack);
+      check('smart collection shows the same results', (await count()) === filteredN, `${await count()} vs ${filteredN}`);
+      check('smart collection marked active', (await page.locator(`#coll-list .ck.on[data-c="${smart.id}"]`).count()) === 1);
+      const smartSide = parseInt(await page.textContent(`#coll-list .ck[data-c="${smart.id}"] .ck-n`), 10);
+      check('sidebar smart count matches', smartSide === smart.count, `${smartSide} vs ${smart.count}`);
+      await shot('flow-03b-collections');
+      // starring/collecting never stales or unapproves anything
+      const stc = await api('/api/state');
+      check('collections do not stale a plan', !stc.plan || !stc.plan.stale);
+      // re-select the hat so the edit step continues as before
+      await page.locator(libRows).filter({ hasText: 'Closed Hat 03' }).first().click();
+      await sleep(300);
+      await page.keyboard.press('Space');
+    }
     // <<< collections checks
     //
     //

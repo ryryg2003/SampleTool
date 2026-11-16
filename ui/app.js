@@ -149,10 +149,13 @@ const Scan = {
       ${card(planOnly('unknown_formats'), 'unknown formats')}
       ${card(planOnly('collisions'), 'name collisions')}
       ${card(planOnly('held'), 'held for review')}
+      ${ss.new_files !== undefined ? `<div class="card c-new${ss.new_files ? ' has-new' : ''}" title="Files that arrived after the last approved run (on the first scan nothing counts as new)"><span class="card-v mono">${Fmt.num(ss.new_files)}</span><span class="card-k">new since last run</span>${ss.new_files ? `<span class="card-s mono">${Fmt.num(ss.new_packs)} pack${ss.new_packs === 1 ? '' : 's'}${ss.new_bytes ? ' · ' + Fmt.bytes(ss.new_bytes) : ''}</span>` : ''}</div>` : ''}
     </div>
     ${!ss.duplicate_groups && !s.plan ? '<p class="hint">Duplicate, collision and hold counts appear once a plan is built.</p>' : ''}
-    <div class="next-step"><button class="btn btn-primary" type="button" id="scan-to-lib">Browse library</button><button class="btn" type="button" id="scan-to-review">Review plan</button></div>`;
+    <div class="next-step"><button class="btn btn-primary" type="button" id="scan-to-lib">Browse library</button><button class="btn" type="button" id="scan-to-review">Review plan</button>${ss.new_files ? `<button class="btn" type="button" id="scan-plan-new" title="Only new files get moved; everything else is kept where it is for a later plan. You still review and approve.">Plan only new files (${Fmt.num(ss.new_files)})</button><button class="btn btn-ghost" type="button" id="scan-see-new">Show new files</button>` : ''}</div>`;
     $('#scan-to-lib').onclick = () => Shell.go('library');
+    if ($('#scan-plan-new')) $('#scan-plan-new').onclick = () => Collections.planOnlyNew();
+    if ($('#scan-see-new')) $('#scan-see-new').onclick = () => { Library.clearAll(); Library.setNewOnly(true); Shell.go('library'); };
     $('#scan-to-review').onclick = () => Shell.go('review');
   },
   show() { this.renderSummary(); if (Shell.progress) this.renderProgress(Shell.progress); },

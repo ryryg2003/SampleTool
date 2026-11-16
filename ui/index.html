@@ -144,7 +144,14 @@
 
     <!-- ============ LIBRARY ============ -->
     <section class="view view-library" id="view-library" aria-labelledby="lib-h" hidden>
-      <aside class="packs" aria-label="Packs">
+      <aside class="packs" aria-label="Collections and packs">
+        <section class="coll-side" id="coll-side" aria-labelledby="coll-h">
+          <div class="coll-head">
+            <h2 class="side-h" id="coll-h">Collections</h2>
+            <button type="button" class="ib" id="coll-new" aria-label="New collection" title="New collection"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></button>
+          </div>
+          <ul class="coll-list" id="coll-list" aria-label="Favorites and collections"></ul>
+        </section>
         <div class="packs-head">
           <h2 class="side-h">Packs <span class="mono dim" id="pack-n"></span></h2>
           <div class="search search-sm"><svg aria-hidden="true"><use href="#i-search"/></svg><input class="input" id="pack-q" type="search" placeholder="Pack or maker" aria-label="Search packs by name or manufacturer"></div>
@@ -175,12 +182,14 @@
             <select class="input" data-f="genre" aria-label="Genre"><option value="">Genre</option></select>
             <select class="input" data-f="manufacturer" aria-label="Manufacturer"><option value="">Maker</option></select>
             <span class="bpm-range"><input class="input mono" data-f="bpm_min" type="number" min="0" max="999" placeholder="BPM" aria-label="Minimum BPM"><span aria-hidden="true">–</span><input class="input mono" data-f="bpm_max" type="number" min="0" max="999" placeholder="max" aria-label="Maximum BPM"></span>
+            <button type="button" class="fbtn" id="lib-new" aria-pressed="false" title="Files that arrived after the last approved run (or the first scan)">New since last run <b class="mono" id="lib-new-n"></b></button>
             <select class="input" data-f="status" aria-label="Review status"><option value="">Status</option><option value="ok">OK</option><option value="needs-review">Needs review</option><option value="edited">Edited</option><option value="held">Held</option><option value="excluded">Excluded</option><option value="done">Organized</option></select>
           </div>
           <div class="chips-row" id="lib-chips-row">
             <div class="chips" id="lib-chips"></div>
             <span class="count mono" id="lib-count"></span>
             <label class="check check-sm" title="By default only audio, MIDI and presets are listed. Tick to include artwork, documents and other files."><input type="checkbox" id="lib-allfiles"> Show all files</label>
+            <button class="btn btn-small btn-ghost" id="lib-save-smart" hidden title="Save this search and these filters as a smart collection">Save search…</button>
             <button class="btn btn-small btn-ghost" id="lib-clear" hidden>Clear all filters</button>
           </div>
           <div class="vt" id="lib-table"></div>
@@ -188,6 +197,8 @@
             <span id="sel-n" class="mono"></span>
             <button class="btn btn-small" id="sel-edit">Bulk edit…</button>
             <button class="btn btn-small" id="sel-kit">Create kit…</button>
+            <button class="btn btn-small" id="sel-star"><svg><use href="#i-star"/></svg>Star</button>
+            <button class="btn btn-small" id="sel-coll">Add to collection…</button>
             <button class="btn btn-small btn-ghost" id="sel-clear">Clear selection</button>
           </div>
         </div>
