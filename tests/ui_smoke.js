@@ -49,6 +49,25 @@ function url(hash) {
   const settle = (ms) => page.waitForTimeout(ms || 350);
 
   try {
+    // ---------- Play all clock (pure math from ui/mixclock.js, no browser) ----------
+    {
+      const MixClock = require('../ui/mixclock.js');
+      const bar8 = (bpm, rate) => (8 * 240 / bpm) / rate;  // real time of bar 8
+      const p = MixClock.plan([{ bpm: 79, bars: 8, duration: 30 }, { bpm: 79.3, bars: 8, duration: 30 }], 79);
+      const drift = Math.abs(bar8(79, p.loops[0].rate) - bar8(79.3, p.loops[1].rate)) * 1000;
+      check('play all: 79 and 79.3 BPM stay within 10 ms after 8 bars', drift < 10, `drift=${drift.toFixed(3)}ms`);
+      const raw = Math.abs(bar8(79, 1) - bar8(79.3, 1)) * 1000;
+      check('play all: without playbackRate they would drift past 10 ms', raw > 10, `raw=${raw.toFixed(1)}ms`);
+      check('play all: both loops share one cycle', Math.abs(p.loops[0].period - p.loops[1].period) * 1000 < 10 && Math.abs(p.cycle - 8 * 240 / 79) < 0.01);
+      const h = MixClock.plan([{ bpm: 79, bars: 4, duration: 13 }, { bpm: 158.5, bars: 8, duration: 13 }], 79);
+      check('play all: double-time loop plays near rate 1', Math.abs(h.loops[1].rate - 1) < 0.005 && Math.abs(h.loops[0].period - h.loops[1].period) * 1000 < 10);
+      check('play all: pitch change under 9 cents at 0.5%', Math.abs(1200 * Math.log2(p.loops[1].rate)) < 9);
+      const g = MixClock.gains([0.3, 0.075, 0.15]);
+      const out = [0.3 * g[0], 0.075 * g[1], 0.15 * g[2]];
+      check('play all: RMS gains even out loudness', Math.max(...out) / Math.min(...out) < 1.01, out.map((x) => x.toFixed(3)).join(','));
+      check('play all: summed gain leaves headroom', out.reduce((a, b) => a + b, 0) < 1);
+    }
+
     // ---------- Library ----------
     await page.goto(url('library'));
     await page.waitForSelector(rows, { timeout: 15000 });

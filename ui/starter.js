@@ -76,37 +76,64 @@ const Starter = {
     $('#bs-save').disabled = !Object.keys(this.ids()).length;
   },
 
-  /* ---- play all three together, looped (Web Audio, sample-accurate start) ---- */
+  /* ---- Play all: one shared clock (see mixclock.js) ----
+     Each cycle starts every loop at the same AudioContext time, at the set
+     tempo (playbackRate), with RMS-balanced gain, and restarts them together
+     at the next cycle so tiny tempo differences never pile up. */
   async togglePlayAll() {
-    if (this.sources) { this.stopAll(); return; }
-    const ids = Object.values(this.ids());
-    if (!ids.length) return;
+    if (this.mix) { this.stopAll(); return; }
+    const picks = Object.values((this.res && this.res.slots) || {}).filter(Boolean).map((v) => v.row);
+    if (!picks.length) return;
     if (API.fixture) { toast('Audio is unavailable in fixture mode. Play all works with your real library.'); return; }
     Player.stop();
     const btn = $('#bs-playall');
     btn.disabled = true;
     try {
       this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)();
-      const bufs = await Promise.all(ids.map(async (id) => {
-        const r = await fetch(API.audioUrl(id));
+      const bufs = await Promise.all(picks.map(async (row) => {
+        const r = await fetch(API.audioUrl(row.id));
         if (!r.ok) throw new Error('could not load audio (' + r.status + ')');
         return this.ctx.decodeAudioData(await r.arrayBuffer());
       }));
-      const t = this.ctx.currentTime + 0.05;
-      this.sources = bufs.map((b) => {
-        const s = this.ctx.createBufferSource();
-        s.buffer = b; s.loop = true; s.connect(this.ctx.destination); s.start(t);
-        return s;
-      });
+      const setBpm = this.res.bpm || picks.find((r) => r.bpm)?.bpm || null;
+      const plan = MixClock.plan(picks.map((row, k) => ({ bpm: row.bpm, bars: row.bars, duration: bufs[k].duration })), setBpm);
+      const gains = MixClock.gains(bufs.map((b) => MixClock.rms(Array.from({ length: b.numberOfChannels }, (_, c) => b.getChannelData(c)))));
+      const nodes = gains.map((g) => { const n = this.ctx.createGain(); n.gain.value = g; n.connect(this.ctx.destination); return n; });
+      this.mix = { bufs, plan, nodes, live: [], timer: null };
+      this.cycleAt(this.ctx.currentTime + 0.08);
       btn.textContent = 'Stop';
     } catch (e) {
       toast('Play all failed: ' + e.message + '. AIFF and other formats the browser cannot decode are skipped by preview.', 'err');
       this.stopAll();
     } finally { btn.disabled = false; }
   },
+  cycleAt(t) {
+    const m = this.mix;
+    if (!m || !m.plan.cycle) return;
+    const end = t + m.plan.cycle;
+    m.live = m.live.filter((s) => s.endsAt > this.ctx.currentTime);
+    m.bufs.forEach((b, k) => {
+      const L = m.plan.loops[k];
+      const s = this.ctx.createBufferSource();
+      s.buffer = b; s.loop = true; s.loopStart = 0; s.loopEnd = L.loopEnd;
+      s.playbackRate.value = L.rate;
+      s.connect(m.nodes[k]);
+      s.start(t); s.stop(end);
+      s.endsAt = end;
+      m.live.push(s);
+    });
+    // Queue the next cycle shortly before this one ends, on the same clock.
+    const wait = Math.max(0, (end - this.ctx.currentTime - 0.4) * 1000);
+    m.timer = setTimeout(() => this.cycleAt(end), wait);
+  },
   stopAll() {
-    for (const s of this.sources || []) { try { s.stop(); } catch (e) { /* already stopped */ } }
-    this.sources = null;
+    const m = this.mix;
+    if (m) {
+      clearTimeout(m.timer);
+      for (const s of m.live) { try { s.stop(); } catch (e) { /* already stopped */ } }
+      for (const n of m.nodes) { try { n.disconnect(); } catch (e) { /* gone */ } }
+    }
+    this.mix = null;
     const btn = $('#bs-playall');
     if (btn) btn.textContent = 'Play all';
   },
