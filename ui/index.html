@@ -149,7 +149,7 @@
 
     <!-- ============ LIBRARY ============ -->
     <section class="view view-library" id="view-library" aria-labelledby="lib-h" hidden>
-      <aside class="packs" aria-label="Packs">
+      <aside class="packs glass" aria-label="Packs">
         <div class="packs-head">
           <h2 class="side-h">Packs <span class="mono dim" id="pack-n"></span></h2>
           <div class="search search-sm"><svg aria-hidden="true"><use href="#i-search"/></svg><input class="input" id="pack-q" type="search" placeholder="Pack or maker" aria-label="Search packs by name or manufacturer"></div>
@@ -158,20 +158,23 @@
       </aside>
 
       <div class="lib-main">
-        <header class="lib-head">
+        <header class="lib-head head-card">
           <div class="lib-title">
+            <span class="lib-eyebrow" aria-hidden="true">Library</span>
             <h1 id="lib-h">Full library</h1>
             <span class="lib-sub" id="lib-sub"></span>
           </div>
-          <div class="tabs tabs-inline" role="tablist" aria-label="Pack contents" id="lib-tabs" hidden>
-            <button class="tab" role="tab" id="ltab-sounds" aria-selected="true" aria-controls="lib-sounds">Sounds</button>
-            <button class="tab" role="tab" id="ltab-kits" aria-selected="false" aria-controls="lib-kits">Kits <span class="tab-n" id="ltab-kits-n"></span></button>
-          </div>
-        </header>
-        <div id="lib-sounds" class="lib-sounds" role="tabpanel">
           <div class="lib-search">
             <div class="search search-lg"><svg aria-hidden="true"><use href="#i-search"/></svg><input class="input" id="lib-q" type="search" placeholder="Search name, pack, maker, instrument, kit, BPM, key, genre, tags" aria-label="Search samples" autocomplete="off" spellcheck="false"><kbd>/</kbd></div>
           </div>
+        </header>
+        <div class="tabs tabs-inline lib-tabs" role="tablist" aria-label="Pack contents" id="lib-tabs" hidden>
+          <button class="tab" role="tab" id="ltab-sounds" aria-selected="true" aria-controls="lib-sounds">Sounds</button>
+          <button class="tab" role="tab" id="ltab-kits" aria-selected="false" aria-controls="lib-kits">Kits <span class="tab-n" id="ltab-kits-n"></span></button>
+        </div>
+        <div id="lib-sounds" class="lib-sounds" role="tabpanel">
+          <div class="lib-stats" id="lib-stats" role="group" aria-label="Filter by category"></div>
+          <div class="lib-filterbar">
           <div class="filters" id="lib-filters" aria-label="Filters">
             <select class="input" data-f="category" aria-label="Category"><option value="">Category</option></select>
             <select class="input" data-f="instrument" aria-label="Instrument"><option value="">Instrument</option></select>
@@ -188,8 +191,9 @@
             <label class="check check-sm" title="By default only audio, MIDI and presets are listed. Tick to include artwork, documents and other files."><input type="checkbox" id="lib-allfiles"> Show all files</label>
             <button class="btn btn-small btn-ghost" id="lib-clear" hidden>Clear all filters</button>
           </div>
-          <div class="vt" id="lib-table"></div>
-          <div class="selbar" id="selbar" hidden>
+          </div>
+          <div class="vt lib-table glass" id="lib-table"></div>
+          <div class="selbar glass" id="selbar" hidden>
             <span id="sel-n" class="mono"></span>
             <button class="btn btn-small" id="sel-edit">Bulk edit…</button>
             <button class="btn btn-small" id="sel-kit">Create kit…</button>
@@ -199,7 +203,7 @@
         <div id="lib-kits" class="lib-kits" role="tabpanel" hidden></div>
       </div>
 
-      <aside class="inspector" id="inspector" aria-label="Sample details"></aside>
+      <aside class="inspector glass" id="inspector" aria-label="Sample details"></aside>
     </section>
 
     <!-- ============ MOVE LOG ============ -->
