@@ -143,6 +143,10 @@ const App = {
   facets: null,
   view: 'library',
   listeners: {},
+  views: {},          // name -> {obj, title}; obj.show() is called when routed
+  features: [],       // feature modules: {init(), afterInit?()}; push at script load time
+  keyHandlers: [],    // (ev) => true when handled; run for keys outside text fields, after Alt+N
+  registerView(name, obj, title) { this.views[name] = { obj, title }; },
   on(ev, fn) { (this.listeners[ev] = this.listeners[ev] || []).push(fn); },
   emit(ev, data) { (this.listeners[ev] || []).forEach((fn) => { try { fn(data); } catch (e) { console.error(e); } }); },
   async refreshState() {

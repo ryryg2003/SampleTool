@@ -58,7 +58,7 @@ function url(hash) {
     const total0 = await countOf('#lib-count');
     check('library loads rows', total0 > 0, `count=${total0}`);
     check('no horizontal page overflow (library)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-    check('nav always visible', (await page.locator('.rail-btn').count()) === 4);
+    check('nav always visible', (await page.locator('.rail-btn').count()) === 6);
     await shot('01-library');
 
     // search (debounced)
@@ -299,6 +299,26 @@ function url(hash) {
     }
     await shot('10-scan');
 
+    // >>> media checks (owned by the media feature; insert between these lines)
+    // <<< media checks
+    //
+    //
+    // >>> collections checks (owned by the collections feature; insert between these lines)
+    // <<< collections checks
+    //
+    //
+    // >>> undo checks (owned by the undo feature; insert between these lines)
+    // <<< undo checks
+    //
+    //
+    // >>> findsounds checks (owned by the findsounds feature; insert between these lines)
+    // <<< findsounds checks
+    //
+    //
+    // >>> settings checks (owned by the settings feature; insert between these lines)
+    // <<< settings checks
+    //
+    //
     // ---------- Focus ring visible ----------
     await page.focus('.rail-btn[data-view="library"]');
     await page.keyboard.press('Shift+Tab');

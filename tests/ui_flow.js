@@ -75,6 +75,15 @@ async function waitIdle(timeout = 60000) {
     await shot('flow-03-audition');
     await page.keyboard.press('Space');
 
+    // >>> media checks (owned by the media feature; insert between these lines)
+    // <<< media checks
+    //
+    //
+    // >>> collections checks (owned by the collections feature; insert between these lines)
+    // <<< collections checks
+    //
+    //
+
     // 5. Correct its category with the bulk editor
     await page.click('#sel-edit').catch(async () => { await page.keyboard.press('e'); });
     await page.waitForSelector('#bulk-dlg[open]', { timeout: 5000 });
@@ -125,6 +134,14 @@ async function waitIdle(timeout = 60000) {
     await sleep(500);
     await shot('flow-06-log');
     check('verification reconciles', (await api('/api/state')).execution.verification.ok === true);
+    // >>> undo checks (owned by the undo feature; insert between these lines)
+    // <<< undo checks
+    //
+    //
+    // >>> settings checks (owned by the settings feature; insert between these lines)
+    // <<< settings checks
+    //
+    //
   } catch (e) {
     check('flow ran to completion', false, e.message);
     await shot('flow-error').catch(() => {});

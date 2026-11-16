@@ -25,12 +25,12 @@ const Shell = {
   go(v) { if (location.hash !== '#' + v) location.hash = v; else this.route(); },
   route() {
     let v = location.hash.replace('#', '');
-    if (!['scan', 'review', 'library', 'log'].includes(v)) v = App.state && !App.state.has_inventory ? 'scan' : 'library';
+    if (!App.views[v]) v = App.state && !App.state.has_inventory ? 'scan' : 'library';
     App.view = v;
     $$('.view').forEach((s) => { s.hidden = s.id !== 'view-' + v; });
     $$('.rail-btn').forEach((b) => { const on = b.dataset.view === v; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-    document.title = { scan: 'Scan', review: 'Review', library: 'Library', log: 'Move Log' }[v] + ' · Sample Library Organizer';
-    ({ scan: Scan, review: Review, library: Library, log: MoveLog })[v].show();
+    document.title = App.views[v].title + ' · Sample Library Organizer';
+    App.views[v].obj.show();
   },
   pollSoon() { clearTimeout(this.pt); this.pt = setTimeout(() => this.poll(), 120); },
   async poll() {
@@ -247,7 +247,9 @@ document.addEventListener('keydown', (ev) => {
     }
     return;
   }
-  if (ev.altKey && ['1', '2', '3', '4'].includes(ev.key)) { ev.preventDefault(); Shell.go(['scan', 'review', 'library', 'log'][+ev.key - 1]); return; }
+  const order = $$('.rail-btn').map((b) => b.dataset.view);
+  if (ev.altKey && /^[1-9]$/.test(ev.key) && order[+ev.key - 1]) { ev.preventDefault(); Shell.go(order[+ev.key - 1]); return; }
+  for (const h of App.keyHandlers) { if (h(ev)) return; }
   if (ev.key === '/') {
     ev.preventDefault();
     const s = { library: '#lib-q', review: '#op-q', log: '#log-q', scan: '#scan-root' }[App.view];
@@ -284,10 +286,16 @@ document.addEventListener('keydown', (ev) => {
   }
   Player.init();
   Shell.init();
+  App.registerView('scan', Scan, 'Scan');
+  App.registerView('review', Review, 'Review');
+  App.registerView('library', Library, 'Library');
+  App.registerView('log', MoveLog, 'Move Log');
+  for (const f of App.features) { try { f.init(); } catch (e) { console.error(e); } }
   Scan.init();
   Library.init();
   Review.init();
   MoveLog.init();
+  for (const f of App.features) { if (f.afterInit) { try { f.afterInit(); } catch (e) { console.error(e); } } }
   App.on('state', (s) => Shell.renderPlanStatus(s));
   await App.refreshState();
   App.refreshFacets();

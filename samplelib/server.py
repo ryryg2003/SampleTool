@@ -16,8 +16,31 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional
 
-from . import models
+from . import __version__, models
 from .store import Store
+
+# Feature modules plug in here. Each optional module samplelib/api_<name>.py may define:
+#   init(app)                       called once when the server starts
+#   get(handler, path, q) -> bool   return True when it handled (and answered) the GET
+#   post(handler, path, b) -> bool  return True when it handled (and answered) the POST
+#   MUTATING: set[str]              POST paths refused while an approved run is executing
+#   state(app) -> dict              extra keys merged into GET /api/state
+EXTENSION_NAMES = ("undo", "media", "collections", "freesound", "settings")
+
+
+def _load_extensions() -> list:
+    import importlib
+    mods = []
+    for n in EXTENSION_NAMES:
+        try:
+            mods.append(importlib.import_module(f"{__package__}.api_{n}"))
+        except ModuleNotFoundError as e:
+            if e.name != f"{__package__}.api_{n}":
+                raise
+    return mods
+
+
+EXTENSIONS = _load_extensions()
 
 UI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ui")
 
@@ -287,7 +310,12 @@ class Handler(BaseHTTPRequestHandler):
             from .store import scan_summary
             with st.lock:
                 ssum = scan_summary(st) if st.items else None
-            return self._send(200, {"root": st.root, "dest_root": st.dest_root, "data_dir": st.data_dir,
+            extra: dict = {}
+            for ext in EXTENSIONS:
+                if hasattr(ext, "state"):
+                    extra.update(ext.state(app))
+            return self._send(200, {**extra, "version": __version__,
+                                    "root": st.root, "dest_root": st.dest_root, "data_dir": st.data_dir,
                                     "scan_summary": ssum,
                                     "has_inventory": bool(st.items), "progress": app.get_progress(),
                                     "plan": plan, "execution": ex,
@@ -355,6 +383,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._plan(q)
         if path == "/api/log":
             return self._log(q)
+        for ext in EXTENSIONS:
+            if hasattr(ext, "get") and ext.get(self, path, q):
+                return None
         return self._err(404, "Unknown endpoint")
 
     def _audio(self, it: dict):
@@ -485,7 +516,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _api_post(self, path: str, b: dict):
         app, st = self.app, self.app.store
-        if path in self.MUTATING and (app.executing or (app.progress.get("running") and
+        mutating = set(self.MUTATING)
+        for ext in EXTENSIONS:
+            mutating |= set(getattr(ext, "MUTATING", ()))
+        if path in mutating and (app.executing or (app.progress.get("running") and
                                                         app.progress.get("job") in ("execute", "export"))):
             raise RuntimeError("Changes are locked while the approved plan is running.")
         if path == "/api/scan" and app.progress.get("running"):
@@ -542,11 +576,17 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("File not found")
             winfs.reveal_in_explorer(p)
             return self._send(200, {"ok": True})
+        for ext in EXTENSIONS:
+            if hasattr(ext, "post") and ext.post(self, path, b):
+                return None
         return self._err(404, "Unknown endpoint")
 
 
 def serve(store: Store, host: str = "127.0.0.1", port: int = 8765) -> tuple[ThreadingHTTPServer, App]:
     app = App(store)
+    for ext in EXTENSIONS:
+        if hasattr(ext, "init"):
+            ext.init(app)
     handler = type("BoundHandler", (Handler,), {"app": app})
     last_err = None
     for p in [port] + list(range(port + 1, port + 20)) + [0]:

@@ -2,6 +2,8 @@
    Enabled with ?fixture=1 or when /api/state cannot be loaded.
    Deterministic synthetic data (~2,000 rows, 15 packs, kits, duplicates,
    held items, a plan and a move log). Edits mutate memory only. */
+// Feature files push (method, path, query, body, state, helpers) => response or null.
+window.FixtureExt = window.FixtureExt || [];
 (function () {
   'use strict';
 
@@ -581,6 +583,7 @@
       return ok({ total: rs.length, items: rs.slice(off, off + lim) });
     }
     if (p === '/api/reveal' && method === 'POST') return ok({ ok: true, fixture: true });
+    for (const ext of (window.FixtureExt || [])) { const r = ext(method, p, q, body, st, { ok, err, items }); if (r) return r; }
     return err(404, 'Fixture has no route for ' + method + ' ' + p);
   }
 
