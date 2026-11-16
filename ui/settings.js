@@ -66,7 +66,13 @@ window.FixtureExt = window.FixtureExt || [];
 const Settings = {
   data: null,
   busy: false,
-  touched: { volume: false, auto: false },
+  /* Player controls touched in this browser session (sessionStorage survives a reload, not a relaunch). */
+  touched: {
+    get volume() { try { return sessionStorage.getItem('slo.touched.volume') === '1'; } catch (e) { return false; } },
+    set volume(v) { try { sessionStorage.setItem('slo.touched.volume', v ? '1' : ''); } catch (e) { /* blocked */ } },
+    get auto() { try { return sessionStorage.getItem('slo.touched.auto') === '1'; } catch (e) { return false; } },
+    set auto(v) { try { sessionStorage.setItem('slo.touched.auto', v ? '1' : ''); } catch (e) { /* blocked */ } },
+  },
 
   init() {
     const v = $('#view-settings');
