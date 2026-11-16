@@ -337,11 +337,10 @@ function url(hash) {
         check('find: only CC0 badges by default', (await page.locator('#fs-results .fs-badge.fs-by').count()) === 0 && (await page.locator('#fs-results .fs-badge.fs-cc0').count()) === n0);
         check('find: Open on Freesound opens a new tab', (await page.getAttribute('#fs-results .fs-row a.btn', 'target')) === '_blank');
         check('find: quota counts the search', /1 \/ 2,000/.test(await page.textContent('#fs-quota')));
+        await page.fill('#fs-q', '');
         await page.click('#fs-attr');
         await page.waitForSelector('#fs-results .fs-badge.fs-by', { timeout: 5000 });
         check('find: attribution toggle adds CC BY results', (await page.getAttribute('#fs-attr', 'aria-pressed')) === 'true');
-        await page.fill('#fs-q', '');
-        await page.press('#fs-q', 'Enter');
         await page.waitForSelector('#fs-pager:not([hidden])', { timeout: 5000 });
         await page.click('#fs-next');
         await settle(400);
