@@ -105,3 +105,90 @@ class AnalysisTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScanIntegrationTest(unittest.TestCase):
+    """classify.analyze_items: evidence order, warnings, cache, selection."""
+
+    def setUp(self):
+        from samplelib import classify, inventory
+        self.classify = classify
+        self.root = tempfile.mkdtemp()
+        loops = os.path.join(self.root, "Pack", "Loops")
+        shots = os.path.join(self.root, "Pack", "One Shots")
+        os.makedirs(loops)
+        os.makedirs(shots)
+        files = {
+            os.path.join(loops, "Synth Loop A.wav"): _wav(mf.beat_loop(128, 4, "Am")),
+            os.path.join(loops, "Synth Loop 140 BPM.wav"): _wav(mf.beat_loop(128, 2, "Am")),
+            os.path.join(loops, "Synth Loop 64 BPM.wav"): _wav(mf.beat_loop(128, 2, "Am")),
+            os.path.join(shots, "Kick 01.wav"): _wav(mf.kick(1)),
+            os.path.join(shots, "808 Bass.wav"): _wav(mf.sine(55.0, 0.8, 0.6, decay=3, sr=SR)),
+        }
+        for p, b in files.items():
+            with open(p, "wb") as f:
+                f.write(b)
+        self.items = inventory.scan(self.root, os.path.join(self.root, "Samples"), None)["items"]
+        classify.enrich(self.items)
+        self.calls = []
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def counting(self, path, ext, want=frozenset({"tempo", "key"})):
+        self.calls.append(os.path.basename(path))
+        return analysis.analyze(path, ext, want)
+
+    def get(self, name):
+        return next(i for i in self.items if i["name"] == name)
+
+    def run_it(self, cache=None):
+        return self.classify.analyze_items(self.items, cache or {}, analyzer=self.counting)
+
+    def test_fills_unknown_from_analysis(self):
+        self.run_it()
+        m = self.get("Synth Loop A.wav")["meta"]
+        self.assertEqual(m["bpm"]["source"], "analysis")
+        self.assertAlmostEqual(m["bpm"]["value"], 128, delta=1.3)
+        self.assertEqual(m["key"]["source"], "analysis")
+        self.assertEqual(self.get("Synth Loop A.wav")["analysis"]["bars"], 4)
+
+    def test_disagreement_warns_but_keeps_filename(self):
+        self.run_it()
+        it = self.get("Synth Loop 140 BPM.wav")
+        self.assertEqual(it["meta"]["bpm"]["value"], 140)
+        self.assertTrue(any("audio measures 128" in w for w in it["warnings"]), it["warnings"])
+        half = self.get("Synth Loop 64 BPM.wav")
+        self.assertFalse(any("audio measures" in w for w in half["warnings"]))
+
+    def test_manual_edit_survives(self):
+        from samplelib.models import field
+        it = self.get("Synth Loop A.wav")
+        it["meta"]["bpm"] = field(100.0, "manual", None)
+        self.run_it()
+        self.assertEqual(it["meta"]["bpm"]["value"], 100.0)
+        self.assertEqual(it["meta"]["bpm"]["source"], "manual")
+
+    def test_cache_skips_unchanged(self):
+        cache = self.run_it()
+        n = len(self.calls)
+        self.assertGreater(n, 0)
+        for it in self.items:
+            it.pop("analysis", None)
+        self.run_it(dict(cache))
+        self.assertEqual(len(self.calls), n)
+        self.assertEqual(self.get("Synth Loop A.wav")["meta"]["bpm"]["source"], "analysis")
+
+    def test_no_hash_not_cached(self):
+        it = self.get("Synth Loop A.wav")
+        it["sha256"] = None
+        cache = self.run_it()
+        self.assertIn("analysis", it)
+        self.assertFalse(any(k.startswith("None") for k in cache))
+        self.assertEqual(len(cache), len(self.calls) - 1)
+
+    def test_selection(self):
+        self.run_it()
+        self.assertNotIn("Kick 01.wav", self.calls)
+        self.assertIn("808 Bass.wav", self.calls)
+        self.assertEqual(self.get("808 Bass.wav")["analysis"]["key"], "A")

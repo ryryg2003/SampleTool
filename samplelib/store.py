@@ -50,6 +50,7 @@ class Store:
         self.approved_hash: Optional[str] = None
         self.execution: Optional[dict] = None
         self.hash_cache: dict = {}
+        self.analysis_cache: dict = {}
         self.gen = 0  # bumps on every edit/rescan; a plan built from an older gen is stale
         self._hay: dict[str, str] = {}
         self._dup_counts: dict[str, int] = {}
@@ -103,6 +104,7 @@ class Store:
         self.edits = self._read_json("edits.json", {})
         self.kit_edits = self._read_json("kit_edits.json", [])
         self.hash_cache = self._read_json("hash_cache.json.gz", {})
+        self.analysis_cache = self._read_json("analysis_cache.json.gz", {})
         if inv and os.path.normcase(inv.get("root", "")) == os.path.normcase(self.root):
             self._set_inventory(inv["items"], inv["kits"], persist=False)
         p = self._read_json("plan.json.gz", None)
@@ -162,10 +164,14 @@ class Store:
                     pass
             self._reindex()
 
-    def set_scan_result(self, items: list, kits: list, hash_cache: dict) -> None:
+    def set_scan_result(self, items: list, kits: list, hash_cache: dict,
+                        analysis_cache: Optional[dict] = None) -> None:
         with self.lock:
             self.hash_cache = hash_cache
             self._write_json("hash_cache.json.gz", hash_cache)
+            if analysis_cache is not None:
+                self.analysis_cache = analysis_cache
+                self._write_json("analysis_cache.json.gz", analysis_cache)
             self._set_inventory(items, kits)
             self._invalidate_plan()
             self.execution = None
@@ -418,6 +424,7 @@ class Store:
         audio = it.get("audio") or {}
         meta = it.get("meta", {})
         kit = self.kit_by_id.get(it.get("kit_id")) if it.get("kit_id") else None
+        an = it.get("analysis") or {}
         proposed = None
         if propose and it["origin"] == "incoming":
             try:
@@ -432,6 +439,8 @@ class Store:
             "instrument": self._mv(it, "instrument"), "loop_type": self._mv(it, "loop_type"),
             "bpm": self._mv(it, "bpm"), "key": self._mv(it, "key"), "genre": self._mv(it, "genre"),
             "tags": self._mv(it, "tags") or [],
+            "bars": an.get("bars"), "on_grid": an.get("on_grid"),
+            "downbeat_ms": an.get("downbeat_ms"),
             "duration_s": audio.get("duration_s"), "sample_rate": audio.get("sample_rate"),
             "channels": audio.get("channels"), "bits": audio.get("bits"),
             "sha256": it.get("sha256"), "kit_id": it.get("kit_id"),

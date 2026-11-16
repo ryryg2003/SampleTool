@@ -102,12 +102,18 @@ class App:
         classify.enrich(items, self.set_progress, self.cancel)
         if self.cancel.is_set():
             return
+        self.set_progress({"job": "scan", "phase": "analyzing", "done": 0, "total": 0,
+                           "message": "Measuring tempo and key"})
+        acache = classify.analyze_items(items, dict(st.analysis_cache), self.set_progress,
+                                        self.cancel)
+        if self.cancel.is_set():
+            return
         self.set_progress({"job": "scan", "phase": "kits", "message": "Detecting complete kits"})
         kit_list = kits.detect_kits(items)
         with st.lock:
             if os.path.normcase(st.root) != os.path.normcase(root):
                 raise RuntimeError("The collection folder changed during the scan; results discarded.")
-            st.set_scan_result(items, kit_list, res.get("hash_cache", {}))
+            st.set_scan_result(items, kit_list, res.get("hash_cache", {}), acache)
         self.skipped = res.get("skipped", [])
         n_in = sum(1 for i in items if i["origin"] == "incoming")
         self.set_progress({"job": "scan", "message":

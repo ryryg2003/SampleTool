@@ -11,7 +11,7 @@ function segKeys(group) {
     const n = bs[(i + (ev.key === 'ArrowRight' ? 1 : bs.length - 1)) % bs.length]; n.focus(); n.click();
   });
 }
-const PHASE_LABEL = { walking: 'Finding files', hashing: 'Fingerprinting audio', metadata: 'Reading tags', classifying: 'Classifying sounds', kits: 'Detecting kits', complete: 'Complete', cancelled: 'Cancelled', idle: 'Idle' };
+const PHASE_LABEL = { walking: 'Finding files', hashing: 'Fingerprinting audio', metadata: 'Reading tags', classifying: 'Classifying sounds', analyzing: 'Measuring tempo & key', kits: 'Detecting kits', complete: 'Complete', cancelled: 'Cancelled', idle: 'Idle' };
 const JOB_LABEL = { scan: 'Scanning', plan: 'Building plan', execute: 'Running plan', export: 'Writing reports', idle: 'Idle' };
 
 const Shell = {
