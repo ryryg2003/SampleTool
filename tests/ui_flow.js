@@ -76,6 +76,50 @@ async function waitIdle(timeout = 60000) {
     await page.keyboard.press('Space');
 
     // >>> media checks (owned by the media feature; insert between these lines)
+    {
+      // AIFF auditions in place (converted to WAV by the server), waveform, seek, retrigger
+      const rowSel = '#lib-table .vt-row:not(.is-ph)';
+      await page.click('#lib-clear');
+      await page.fill('#lib-q', 'Bass Hit G');
+      await sleep(700);
+      await page.locator(rowSel).filter({ hasText: 'Bass Hit G.aif' }).first().click();
+      await page.keyboard.press('l'); // loop on: the sample is only 0.6 s long
+      await sleep(900);
+      const a1 = await page.evaluate(() => { const a = document.getElementById('audio'); return { src: a.currentSrc, err: a.error && a.error.code, paused: a.paused, dur: a.duration, ready: a.readyState }; });
+      check('AIFF row is previewable', (await api('/api/samples?q=Bass%20Hit%20G')).items[0].preview === 'native');
+      check('AIFF audio element loads without error', /\/api\/audio\//.test(a1.src) && !a1.err && a1.ready >= 1 && a1.dur > 0.5 && a1.dur < 0.7, JSON.stringify(a1));
+      const adv = await page.evaluate(() => new Promise((res) => {
+        const a = document.getElementById('audio'); const ts = [];
+        const iv = setInterval(() => { ts.push(a.currentTime); if (ts.length === 6) { clearInterval(iv); res(ts); } }, 70);
+      }));
+      check('AIFF playback advances', adv.some((t, i) => i && t > adv[i - 1]), adv.map((t) => t.toFixed(3)).join(','));
+      await sleep(300);
+      const wave = await page.evaluate(() => ({ layers: !!Wave.layers, ink: Wave.inkCount(), w: Wave.cv.width, ph: document.getElementById('tp-wave').classList.contains('is-empty') }));
+      check('waveform canvas is drawn', wave.layers && !wave.ph && wave.ink > wave.w * 3, JSON.stringify(wave));
+      await page.evaluate(() => document.getElementById('audio').pause());
+      const box = await page.locator('#tp-wave').boundingBox();
+      await page.mouse.click(box.x + box.width * 0.75, box.y + box.height / 2);
+      const t3 = await page.evaluate(() => document.getElementById('audio').currentTime);
+      check('clicking the waveform seeks', t3 > 0.38 && t3 < 0.6, String(t3));
+      await sleep(250);
+      await shot('flow-03b-waveform');
+      // retrigger: an arrow key restarts the (same) row from 0 even at the end of the list
+      await page.locator('#lib-table .vt-body').focus();
+      await page.keyboard.press('o');
+      await page.evaluate(() => { const a = document.getElementById('audio'); a.currentTime = 0.4; });
+      await page.keyboard.press('ArrowDown');
+      const rt = await page.evaluate(() => ({ t: document.getElementById('audio').currentTime, paused: document.getElementById('audio').paused }));
+      check('retrigger restarts from the top on arrow keys', rt.t < 0.2 && !rt.paused, JSON.stringify(rt));
+      await page.keyboard.press('o');
+      await page.keyboard.press('l');
+      await page.evaluate(() => Player.stop());
+      // restore the selection the next step edits
+      await page.fill('#lib-q', 'Closed Hat 03');
+      await sleep(700);
+      await page.locator(rowSel).filter({ hasText: 'Closed Hat 03' }).first().click();
+      await sleep(300);
+      await page.evaluate(() => Player.stop());
+    }
     // <<< media checks
     //
     //

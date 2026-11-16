@@ -230,6 +230,10 @@
   </main>
 
   <footer class="deck">
+    <svg class="sr" aria-hidden="true" focusable="false">
+      <symbol id="i-retrig" viewBox="0 0 24 24"><path d="M5 5v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M9 6.5v11l9-5.5z" fill="currentColor"/></symbol>
+      <symbol id="i-clip" viewBox="0 0 24 24"><rect x="6" y="5" width="12" height="15" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M9.5 3.5h5v3h-5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 11h6M9 14.5h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    </svg>
     <div class="transport" id="transport" aria-label="Audition player">
       <button class="tp-btn tp-play" id="tp-play" aria-label="Play" title="Play / stop (Space)"><svg><use href="#i-play"/></svg></button>
       <button class="tp-btn tp-toggle" id="tp-loop" aria-label="Loop" aria-pressed="false" title="Loop (L)"><svg><use href="#i-loop"/></svg></button>
@@ -237,9 +241,14 @@
         <span class="tp-time mono" id="tp-time">0:00.0</span>
         <span class="tp-dur mono" id="tp-dur">/ 0:00.0</span>
       </div>
+      <button class="tp-btn tp-toggle" id="tp-oneshot" aria-pressed="false" aria-label="Retrigger: restart from the top on every arrow key" title="Retrigger: every arrow key restarts the sample from the top (O)"><svg><use href="#i-retrig"/></svg></button>
       <div class="tp-track">
         <div class="tp-name ellip" id="tp-name">Nothing loaded</div>
-        <input type="range" class="scrub" id="tp-scrub" min="0" max="1000" value="0" step="1" aria-label="Playback position" disabled>
+        <div class="tp-wave is-empty" id="tp-wave" title="Click or drag to seek">
+          <canvas class="tp-wave-c" id="tp-wave-c" aria-hidden="true"></canvas>
+          <span class="tp-wave-ph" id="tp-wave-ph" aria-hidden="true"></span>
+          <input type="range" class="scrub" id="tp-scrub" min="0" max="1000" value="0" step="1" aria-label="Playback position" disabled>
+        </div>
       </div>
       <div class="tp-msg" id="tp-msg" role="status"></div>
       <label class="tp-auto" title="Play each sample as you move with the arrow keys"><input type="checkbox" id="tp-auto"> Auto-play on arrows</label>
@@ -320,6 +329,8 @@
       <dt><kbd>Enter</kbd></dt><dd>Play from start</dd>
       <dt><kbd>L</kbd></dt><dd>Loop on / off</dd>
       <dt><kbd>A</kbd></dt><dd>Auto-play on arrows</dd>
+      <dt><kbd>O</kbd></dt><dd>Retrigger: every arrow key restarts from the top</dd>
+      <dt>Drag a row</dt><dd>Drop the file into your DAW or Explorer</dd>
       <dt><kbd>Ctrl</kbd>+<kbd>A</kbd></dt><dd>Select all results</dd>
       <dt><kbd>Ctrl</kbd>/<kbd>Shift</kbd>+click</dt><dd>Add to / extend selection</dd>
       <dt><kbd>E</kbd></dt><dd>Edit selection</dd>
