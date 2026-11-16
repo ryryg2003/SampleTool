@@ -215,6 +215,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._static(u.path)
         except KeyError as e:
             return self._err(404, f"Not found: {e}")
+        except ValueError as e:
+            return self._err(400, str(e))
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as e:
@@ -313,6 +315,14 @@ class Handler(BaseHTTPRequestHandler):
             prop = self._propose()
             return self._send(200, {"total": total, "offset": off,
                                     "items": [st.row(i, prop) for i in rows[off:off + lim]]})
+        m = re.fullmatch(r"/api/samples/([\w-]+)/matches", path)
+        if m:
+            from . import matching
+            role = q.get("role") or None
+            if role and role not in matching.ROLES:
+                raise ValueError("Unknown role: " + role)
+            return self._send(200, {"items": matching.matches(
+                st, m.group(1), role, int(q.get("limit") or 30))})
         m = re.fullmatch(r"/api/samples/([\w-]+)", path)
         if m:
             it = st.by_id[m.group(1)]

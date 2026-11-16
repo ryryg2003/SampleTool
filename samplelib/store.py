@@ -191,6 +191,8 @@ class Store:
         self._hay = {}
         for it in self.items:  # build the search index now so the first search is fast
             self._haystack(it)
+        from . import matching
+        matching.features(self)  # likewise for the first "Goes well with" query
 
     def _invalidate_plan(self) -> None:
         self.gen += 1

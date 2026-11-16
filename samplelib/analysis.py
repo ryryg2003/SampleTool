@@ -11,6 +11,7 @@ Failures return (None, [warning]); silence returns a result full of None.
 from __future__ import annotations
 
 import array
+import functools
 import math
 import struct
 import sys
@@ -351,6 +352,7 @@ def analyze(path: str, ext: str, want=frozenset({"tempo", "key"})):
 
 
 # ------------------------------------------------------------------ keys
+@functools.lru_cache(maxsize=256)
 def norm_key(key):
     if not key:
         return None
@@ -363,6 +365,7 @@ def norm_key(key):
     return base + ("m" if minor else "")
 
 
+@functools.lru_cache(maxsize=256)
 def camelot(key):
     """Camelot wheel code ("8A" = A minor, "8B" = C major) or None."""
     k = norm_key(key)
@@ -376,6 +379,7 @@ def camelot(key):
     return "%d%s" % (num, "A" if minor else "B")
 
 
+@functools.lru_cache(maxsize=4096)
 def key_compat(a, b):
     """-> (score 0..1, reason) for two keys."""
     ca, cb = camelot(a), camelot(b)
