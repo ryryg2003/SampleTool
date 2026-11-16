@@ -50,7 +50,6 @@ const Library = {
       sort: Store.get('lib.sort', 'name'), dir: Store.get('lib.dir', 'asc'),
       columns: [
         { key: 'play', label: '', sr: 'Playing', width: '28px', cls: 'c-play', render: (r) => `<i class="pl${Player.isPlaying(r.id) ? ' on' : Player.row && Player.row.id === r.id ? ' loaded' : ''}" aria-hidden="true"></i>` },
-        { key: 'star', label: '', sr: 'Starred', width: '24px', cls: 'c-star', render: (r) => starBtn(r) },
         { key: 'name', label: 'Name', sort: 'name', width: 'minmax(150px, 2.2fr)', cls: 'c-name', title: (r) => r.abs_path, render: (r) => `<span class="nm ellip">${esc(r.name)}</span>${extBadge(r)}${r.kit_name ? `<span class="kitmark" title="Part of kit ${esc(r.kit_name)}">kit</span>` : ''}${r.dup_count > 1 ? `<span class="dupmark mono" title="${r.dup_count} identical copies">×${r.dup_count}</span>` : ''}` },
         { key: 'pack', label: 'Pack', sort: 'pack', width: 'minmax(90px, 1.1fr)', cls: 'c-pack', title: (r) => r.pack || '', render: (r) => `<span class="ellip">${esc(r.pack ? shortPack(r.pack, r.manufacturer) : (r.origin === 'library' ? 'In library' : '—'))}</span>` },
         { key: 'inst', label: 'Instrument', width: 'minmax(64px, .55fr)', cls: 'c-inst', title: (r) => r.category || '', render: (r) => `<span class="ellip">${esc(r.instrument || Fmt.catShort(r.category) || '—')}</span>` },
@@ -59,6 +58,7 @@ const Library = {
         { key: 'dur', label: 'Length', sort: 'duration', width: '54px', cls: 'num', render: (r) => r.duration_s ? Fmt.dur(r.duration_s) : '' },
         { key: 'size', label: 'Size', sort: 'size', width: '60px', cls: 'num', render: (r) => Fmt.bytes(r.size) },
         { key: 'st', label: 'Status', sort: 'status', width: '76px', cls: 'c-st', render: (r) => statusBadge(r.review_status) },
+        { key: 'star', label: '', sr: 'Starred', width: '24px', cls: 'c-star', render: (r) => starBtn(r) },
         { key: 'act', label: '', sr: 'Actions', width: '72px', cls: 'c-act', render: () => `<button type="button" class="ib" data-act="copy" aria-label="Copy path" title="Copy path" tabindex="-1"><svg><use href="#i-copy"/></svg></button><button type="button" class="ib" data-act="reveal" aria-label="Show in Explorer" title="Show in Explorer" tabindex="-1"><svg><use href="#i-folder"/></svg></button><button type="button" class="ib" data-act="edit" aria-label="Edit" title="Edit (E)" tabindex="-1"><svg><use href="#i-edit"/></svg></button>` },
       ],
       fetch: (offset, limit) => API.get('/api/samples', Object.assign(this.params(), { sort: this.table.sort, dir: this.table.dir, offset, limit })),
@@ -69,7 +69,7 @@ const Library = {
       onRowClick: (i, r, ev) => this.click(i, r, ev),
       onRowDblClick: (i, r) => Player.play(r, true),
       onAction: (act, r, i) => {
-        if (act === 'star') { if (window.Collections) Collections.star([r]); }
+        if (act === 'star') { if ((typeof Collections !== 'undefined')) Collections.star([r]); }
         else if (act === 'copy') copyText(r.abs_path);
         else if (act === 'reveal') reveal({ id: r.id });
         else if (act === 'edit') { if (!this.sel.has(r.id)) this.selectOnly(i, r); this.openBulk(); }
@@ -149,7 +149,7 @@ const Library = {
     this.q = p.q || ''; $('#lib-q').value = this.q;
     this.allFiles = !p.kind; $('#lib-allfiles').checked = this.allFiles; Store.set('lib.allFiles', this.allFiles);
     this.newOnly = p.new === '1' || p.new === 'true';
-    this.coll = p.fav ? { id: 'fav', name: 'Favorites' } : p.collection ? { id: p.collection, name: (window.Collections && Collections.name(p.collection)) || 'Collection' } : null;
+    this.coll = p.fav ? { id: 'fav', name: 'Favorites' } : p.collection ? { id: p.collection, name: ((typeof Collections !== 'undefined') && Collections.name(p.collection)) || 'Collection' } : null;
     if ((p.pack || null) !== this.pack) { this.setPack(p.pack || null); return; }
     this.apply();
   },
@@ -431,7 +431,7 @@ const Library = {
         ${d.dup_count > 1 ? `<p class="note">${d.dup_count} identical copies of this file exist. The plan keeps one physical copy.</p>` : ''}
         ${(d.warnings || []).length ? `<ul class="warns">${d.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
         ${this.detail && this.detail.tags_raw && Object.keys(this.detail.tags_raw).length ? `<details class="raw"><summary>Embedded tags</summary><pre class="mono">${esc(JSON.stringify(this.detail.tags_raw, null, 1))}</pre></details>` : ''}
-        ${window.Collections ? Collections.inspectorHtml(d) : ''}
+        ${(typeof Collections !== 'undefined') ? Collections.inspectorHtml(d) : ''}
         <p class="dim small mono">sha256 ${esc(Fmt.hash8(d.sha256))}…</p>
       </div>`;
     $('#ins-play').onclick = () => { Player.toggle(d); this.renderInspector(); };

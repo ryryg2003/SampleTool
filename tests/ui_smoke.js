@@ -304,6 +304,47 @@ function url(hash) {
     //
     //
     // >>> collections checks (owned by the collections feature; insert between these lines)
+    {
+      if (fixture) check('scan summary shows new files card', /new since last run/.test(await page.textContent('#scan-summary')));
+      await page.click('.rail-btn[data-view="library"]');
+      await page.waitForSelector(rows, { timeout: 10000 });
+      await page.click('#lib-clear').catch(() => {});
+      await settle(400);
+      check('collections sidebar renders Favorites', (await page.locator('#coll-list .ck[data-c="fav"]').count()) === 1);
+      check('packs list still visible beside collections', await page.$eval('#pack-list', (el) => el.getBoundingClientRect().height > 200));
+      const totalAll = await countOf('#lib-count');
+      if (fixture) {
+        // star the first row with S
+        await page.click(`${rows} >> nth=0`);
+        await settle(300);
+        await page.keyboard.press('Space'); // stop the audition it started
+        await page.keyboard.press('s');
+        await settle(500);
+        check('S stars the current sample', (await page.locator(`${rows} >> nth=0`).locator('.ib.star.on').count()) === 1);
+        check('star button in inspector', (await page.locator('#ins-star.on').count()) === 1);
+        const favN = await page.$eval('#coll-list .ck[data-c="fav"] .ck-n', (e) => parseInt(e.textContent, 10));
+        check('Favorites count updates', favN >= 1, String(favN));
+        await page.click('#coll-list .ck[data-c="fav"]');
+        await settle(500);
+        check('Favorites filters the table', (await countOf('#lib-count')) === favN && (await page.locator('#lib-chips .chip').count()) === 1);
+        await page.click('#coll-list .ck[data-c="fav"]');
+        await settle(400);
+        // star column toggles off again
+        await page.click(`${rows} >> nth=0 >> .ib.star`);
+        await settle(500);
+        check('star column toggles', (await page.locator(`${rows} >> nth=0`).locator('.ib.star.on').count()) === 0);
+        // New filter chip
+        const newN = parseInt((await page.textContent('#lib-new-n')).replace(/\D/g, ''), 10);
+        await page.click('#lib-new');
+        await settle(500);
+        check('New filter chip', (await page.locator('#lib-chips .chip').filter({ hasText: 'New' }).count()) === 1 && (await page.getAttribute('#lib-new', 'aria-pressed')) === 'true');
+        check('New filter narrows the table', (await countOf('#lib-count')) > 0 && (await countOf('#lib-count')) <= newN && (await countOf('#lib-count')) < totalAll);
+        await shot('11-collections');
+        await page.click('#lib-new');
+        await settle(400);
+        check('New filter clears', (await countOf('#lib-count')) === totalAll);
+      }
+    }
     // <<< collections checks
     //
     //
