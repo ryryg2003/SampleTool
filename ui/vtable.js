@@ -135,11 +135,6 @@ class VTable {
     const pg = this.pages.get(Math.floor(i / this.o.pageSize));
     return Array.isArray(pg) ? pg[i % this.o.pageSize] : null;
   }
-  loadedRows() {
-    const out = [];
-    for (const [p, items] of this.pages) if (Array.isArray(items)) items.forEach((r, k) => out.push([p * this.o.pageSize + k, r]));
-    return out;
-  }
   /* Fetch every row (bounded) — used for Ctrl+A select all. */
   async loadAll(max) {
     const total = Math.min(this.total || 0, max || 50000);

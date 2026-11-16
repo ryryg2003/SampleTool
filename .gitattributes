@@ -1,0 +1,15 @@
+# Line endings: Windows batch files must keep CRLF to run reliably.
+* text=auto
+*.bat text eol=crlf
+*.png binary
+*.ico binary
+
+# GitHub "Download ZIP" (git archive) holds only the app.
+tests/ export-ignore
+tools/ export-ignore
+docs/ export-ignore
+.github/ export-ignore
+.gitignore export-ignore
+.gitattributes export-ignore
+CLAUDE.md export-ignore
+run_tests.bat export-ignore

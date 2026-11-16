@@ -15,7 +15,6 @@ import time
 import urllib.request
 from typing import Callable, Optional
 
-from . import __version__
 
 log = logging.getLogger("samplelib")
 
@@ -264,7 +263,3 @@ class IdleWatcher(threading.Thread):
 
     def stop(self) -> None:
         self.stopped.set()
-
-
-def describe() -> str:
-    return f"Sample Library Organizer {__version__}"

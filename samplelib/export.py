@@ -28,11 +28,6 @@ ORG_COLUMNS = ["op_id", "action", "status", "source", "destination", "link_to", 
                "result", "error", "reason", "flags", "kit"]
 
 
-def _val(it, k):
-    f = (it.get("meta") or {}).get(k) or {}
-    return f.get("value") if isinstance(f, dict) else None
-
-
 def _fmt(v):
     if v is None:
         return ""
