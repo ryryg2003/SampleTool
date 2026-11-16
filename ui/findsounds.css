@@ -6,6 +6,7 @@
 .fs-quota { flex: none; width: 300px; display: flex; flex-direction: column; gap: 4px; padding: 7px 10px; background: #0e1114; border: 1px solid #000; border-radius: var(--r-s); box-shadow: inset 0 1px 6px rgba(0, 0, 0, .6); }
 .fs-quota:empty { display: none; }
 .fs-q-row { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; }
+.fs-q-on { margin-left: auto; font-size: 11.5px; color: var(--muted); }
 .fs-q-k { font: 500 11.5px var(--f-label); color: var(--dim); }
 #fs-q-day { color: var(--amber); font-size: 14px; text-shadow: 0 0 8px rgba(240, 180, 60, .35); }
 .fs-q-meter { height: 5px; }
@@ -40,7 +41,7 @@
 
 .fs-results { flex: 1; min-height: 0; overflow-y: auto; position: relative; }
 .fs-list { list-style: none; margin: 0; padding: 0; }
-.fs-row { display: grid; grid-template-columns: 26px minmax(160px, 2.4fr) minmax(70px, .9fr) 52px 40px 70px 56px auto; column-gap: 10px; align-items: center; padding: 5px 10px; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; min-height: 42px; }
+.fs-row { display: grid; grid-template-columns: 26px minmax(160px, 2.4fr) minmax(70px, .9fr) 52px 40px 76px 56px 244px; column-gap: 10px; align-items: center; padding: 5px 10px; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; min-height: 42px; }
 .fs-row:hover { background: #2a3138; }
 .fs-row.is-playing { box-shadow: inset 3px 0 0 var(--amber); background: #2a2f2a; }
 .fs-th { position: sticky; top: 0; z-index: 1; min-height: 30px; background: var(--raised); border-bottom: 1px solid var(--line); font: 500 12px var(--f-label); color: var(--muted); }
@@ -97,7 +98,7 @@ a.fs-badge:hover { filter: brightness(1.2); }
 
 @media (max-width: 1440px) {
   .fs-body { grid-template-columns: minmax(0, 1fr) 260px; }
-  .fs-row { grid-template-columns: 26px minmax(140px, 2.2fr) minmax(60px, .8fr) 48px 36px 62px 50px auto; column-gap: 8px; }
+  .fs-row { grid-template-columns: 26px minmax(140px, 2.2fr) minmax(60px, .8fr) 48px 36px 70px 50px 236px; column-gap: 8px; }
   .fs-quota { width: 270px; }
   .fs-filters select.input { max-width: 140px; }
 }

@@ -49,7 +49,7 @@ const FindSounds = {
               <select class="input" id="fs-type" aria-label="Loop or one-shot"><option value="">Loop / one-shot</option><option value="oneshot">One-shot (≤ 3 s)</option><option value="loop">Loop (tagged loop)</option></select>
               ${sel('fs-key', 'Key', FS_KEYS.map((k) => `<option value="${k}">${k} major</option><option value="${k}m">${k} minor</option>`).join(''))}
               <span class="bpm-range"><input class="input mono" id="fs-bpm-min" type="number" min="0" max="999" placeholder="BPM" aria-label="Minimum BPM"><span aria-hidden="true">–</span><input class="input mono" id="fs-bpm-max" type="number" min="0" max="999" placeholder="max" aria-label="Maximum BPM"></span>
-              <span class="bpm-range"><input class="input mono" id="fs-dur-min" type="number" min="0" step="0.1" placeholder="Len s" aria-label="Minimum length in seconds"><span aria-hidden="true">–</span><input class="input mono" id="fs-dur-max" type="number" min="0" step="0.1" placeholder="max" aria-label="Maximum length in seconds"></span>
+              <span class="bpm-range"><input class="input mono" id="fs-dur-min" type="number" min="0" step="0.1" placeholder="sec" aria-label="Minimum length in seconds"><span aria-hidden="true">–</span><input class="input mono" id="fs-dur-max" type="number" min="0" step="0.1" placeholder="max" aria-label="Maximum length in seconds"></span>
               <select class="input" id="fs-sort" aria-label="Sort">${FS_SORTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
             </div>
             <div class="chips-row fs-lic" aria-label="Licenses">
@@ -127,11 +127,11 @@ const FindSounds = {
     const q = s.quota || {};
     const used = q.day_used || 0, lim = q.day_limit || 2000;
     const pct = Math.min(100, used / lim * 100);
-    const online = s.online === false ? '<span class="fs-led off" title="Last request could not reach freesound.org"></span>Offline' : s.online ? '<span class="fs-led on"></span>Online' : '<span class="fs-led"></span>Not contacted yet';
+    const online = s.online === false ? '<span class="fs-led off" title="Last request could not reach freesound.org"></span>Offline' : s.online ? '<span class="fs-led on"></span>Online' : '<span class="fs-led"></span>Idle';
     box.innerHTML = `
-      <div class="fs-q-row"><span class="fs-q-k">Today</span><span class="mono" id="fs-q-day">${Fmt.num(used)} / ${Fmt.num(lim)}</span><span class="fs-q-k">requests</span></div>
+      <div class="fs-q-row"><span class="fs-q-k">Today</span><span class="mono" id="fs-q-day">${Fmt.num(used)} / ${Fmt.num(lim)}</span><span class="fs-q-k">requests</span><span class="fs-q-on">${online}</span></div>
       <div class="meter fs-q-meter" role="meter" aria-label="Daily Freesound requests used" aria-valuemin="0" aria-valuemax="${lim}" aria-valuenow="${used}"><i style="width:${pct}%"></i></div>
-      <div class="fs-q-row small dim"><span class="mono" id="fs-q-min">${q.minute_remaining ?? '—'}</span>&nbsp;left this minute · downloads <span class="mono">${q.downloads_day_used || 0}/${q.downloads_day_limit || 500}</span> · ${online}</div>
+      <div class="fs-q-row small dim"><span class="mono" id="fs-q-min">${q.minute_remaining ?? '—'}</span>&nbsp;left this minute · <span class="mono">${q.downloads_day_used || 0}/${q.downloads_day_limit || 500}</span>&nbsp;downloads</div>
       ${q.retry_after_s ? `<div class="fs-q-row fs-q-wait">Rate limited, try again in <span class="mono">${q.retry_after_s}</span> s</div>` : ''}`;
   },
 
