@@ -81,3 +81,13 @@ review and approve. Tests use only synthetic temp fixtures. Never touch E:\.
 ## How to resume
 Start a new session on branch `claude/pensive-albattani-xcadya` and say:
 "Resume the v1.0 work from docs/V1_CHECKPOINT.md, using the original brief."
+
+## Session log
+- First usage-limit stop: all five agents stopped mid-work. The container restarted and their
+  uncommitted files were lost, so no feature code survived. Their local branches
+  `worktree-agent-*` survive restarts. Agents were resumed with an order to make a WIP commit after
+  every step.
+- To resume after another stop: check `git worktree list` and each `worktree-agent-*`
+  branch's commits since 6a162b4, then continue or merge from there. Pending release
+  test: the lead keeps `tests/test_release.py` out of the repo until "Create Desktop
+  Shortcut.bat" and CHANGELOG.md exist (it checks for both).
