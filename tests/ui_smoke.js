@@ -460,6 +460,64 @@ function url(hash) {
     //
     //
     // >>> settings checks (owned by the settings feature; insert between these lines)
+    {
+      const rowH = async () => {
+        await page.click('.rail-btn[data-view="library"]');
+        await page.waitForSelector(rows, { timeout: 10000 });
+        await settle(300);
+        return page.evaluate((s) => document.querySelector(s).getBoundingClientRect().height, rows);
+      };
+      const h0 = await rowH();
+      await page.click('.rail-btn[data-view="settings"]');
+      await page.waitForSelector('#settings-h', { state: 'visible', timeout: 5000 });
+      await settle(500);
+      check('settings: title', (await page.title()).startsWith('Settings'));
+      check('settings: collection folder prefilled', (await page.inputValue('#set-root')).length > 0);
+      check('settings: port field', /^\d{4,5}$/.test(await page.inputValue('#set-port')));
+      check('settings: volume slider', /^\d{1,3}$/.test(await page.inputValue('#set-vol')));
+      check('settings: auto-audition checkbox', await page.isVisible('#set-auto'));
+      check('settings: density control', (await page.locator('#set-density [role=radio]').count()) === 2);
+      check('settings: freesound section renders', await page.locator('#set-fs-na, #set-fs-key, #set-fs .err').count() > 0);
+      const about = await page.textContent('#set-about');
+      check('settings: version, data folder and log file shown', /\d+\.\d+\.\d+/.test(about) && /Log file/.test(about) && /App data folder/.test(about), about.slice(0, 160));
+      check('settings: no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await shot('11-settings-1366');
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await settle(300);
+      await shot('11-settings-1920');
+      await page.setViewportSize({ width: 1366, height: 768 });
+      // Switch dialog explains what is cleared; cancelling changes nothing.
+      await page.fill('#set-root', 'D:\\Other Packs');
+      await page.click('#set-switch');
+      await page.waitForSelector('#set-switch-dlg[open]', { timeout: 3000 });
+      check('settings: switch dialog explains plan/approval is cleared', /plan and any approval/.test(await page.textContent('#set-switch-dlg')));
+      await shot('12-settings-switch');
+      await page.click('#set-switch-dlg button[value=cancel]');
+      await settle(200);
+      check('settings: cancel keeps the dialog closed', !(await page.isVisible('#set-switch-dlg')));
+      if (fixture) {
+        await page.fill('#set-port', '80');
+        await page.click('#set-port-save');
+        check('settings: invalid port rejected', await page.isVisible('#set-port-err'));
+        await page.click('#set-density [data-d="compact"]');
+        await settle(300);
+        check('settings: compact sets body class', await page.evaluate(() => document.body.classList.contains('density-compact')));
+        const h1 = await rowH();
+        await shot('13-library-compact');
+        check('settings: compact density shrinks rows', h1 < h0, `${h0} -> ${h1}`);
+        await page.click('.rail-btn[data-view="settings"]');
+        await page.click('#set-density [data-d="comfortable"]');
+        const h2 = await rowH();
+        check('settings: comfortable density restores rows', h2 === h0, `${h0} -> ${h2}`);
+      }
+      await page.click('#btn-keys');
+      await page.waitForSelector('#keys-dlg[open]');
+      check('keys dialog shows version', /\d+\.\d+\.\d+/.test(await page.textContent('#app-version')));
+      await shot('14-keys-version');
+      await page.click('#keys-dlg .dlg-actions .btn');
+      await page.click('.rail-btn[data-view="scan"]');
+      await settle(300);
+    }
     // <<< settings checks
     //
     //

@@ -2,7 +2,7 @@
 rem Runs the Sample Library Organizer test suite (synthetic temp fixtures only).
 setlocal
 cd /d "%~dp0"
-where py >/dev/null 2>nul
+where py >nul 2>nul
 if %errorlevel%==0 (
   py -3 tests\run_all.py %*
 ) else (
