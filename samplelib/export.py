@@ -18,7 +18,7 @@ DONE = ("done", "already-done")
 CATALOG_COLUMNS = (
     ["original_filename", "final_path", "original_path", "kind", "category", "instrument",
      "loop_type", "bpm", "key", "genre", "duration_s", "sample_rate", "channels", "bits",
-     "pack", "manufacturer", "kit", "sha256", "tags", "size"] +
+     "pack", "manufacturer", "kit", "sha256", "tags", "collections", "size"] +
     [c for k in META_KEYS for c in (k + "_source", k + "_confidence")])
 SOURCE_INDEX_COLUMNS = ["original_path", "origin", "status", "final_path", "canonical_path",
                         "verified", "action", "reason", "op_id"]
@@ -78,7 +78,9 @@ def _exists_size(path, size):
         return False
 
 
-def write_reports(catalog_dir, items, kits, plan, results) -> dict:
+def write_reports(catalog_dir, items, kits, plan, results, collections=None) -> dict:
+    """``collections``: optional object with ``names_for(sha256) -> [name]`` (the store's
+    Collections); fills the Sample_Catalog "collections" column ("; " separated)."""
     os.makedirs(catalog_dir, exist_ok=True)
     op_by_item, res, kits_by_id = _index(items, kits, plan, results)
     items_sorted = sorted(items, key=lambda i: (i.get("origin") != "library",
@@ -110,7 +112,8 @@ def write_reports(catalog_dir, items, kits, plan, results) -> dict:
                "duration_s": a.get("duration_s"), "sample_rate": a.get("sample_rate"),
                "channels": a.get("channels"), "bits": a.get("bits"), "pack": it.get("pack"),
                "kit": kit.get("name") if kit else None, "sha256": it.get("sha256"),
-               "size": it.get("size")}
+               "size": it.get("size"),
+               "collections": collections.names_for(it.get("sha256")) if collections else []}
         for k in META_KEYS:
             f = (it.get("meta") or {}).get(k) or {}
             row[k] = f.get("value")
