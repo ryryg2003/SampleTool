@@ -39,6 +39,18 @@ const Fmt = {
   catShort(c) { return c ? c.replace(/^One-Shots\//, '').replace(/^Loops\//, '') : ''; },
 };
 
+/* Category → one of the six palette slugs (drums|bass|synth|vocals|fx|keys).
+   CSS classes .cat-<slug> set --cat to that color. Unsorted/unknown → fx. */
+const CAT_SLUG = {
+  'One-Shots/Drums': 'drums', 'Loops/Drum Loops': 'drums',
+  'One-Shots/Bass & 808s': 'bass', 'Loops/Bass Loops': 'bass',
+  'One-Shots/Instruments': 'synth', 'Loops/Melody Loops': 'synth',
+  'One-Shots/FX & Vocals': 'vocals', 'Loops/Vocal & FX Loops': 'vocals',
+  'Presets & MIDI': 'keys',
+};
+const CAT_SLUGS = ['drums', 'bass', 'synth', 'vocals', 'fx', 'keys'];
+function catSlug(c) { return CAT_SLUG[c] || 'fx'; }
+
 const STATUS_LABEL = { ok: 'OK', 'needs-review': 'Review', edited: 'Edited', held: 'Held', excluded: 'Excluded', done: 'Organized' };
 const ACTION_LABEL = { move: 'Move', link: 'Link', keep: 'Keep', hold: 'Hold', exclude: 'Exclude' };
 const SOURCE_LABEL = { tag: 'Tag', filename: 'Filename', folder: 'Folder', inference: 'Inferred', analysis: 'Analysis', manual: 'Manual' };
