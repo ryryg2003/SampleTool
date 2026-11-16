@@ -91,12 +91,14 @@ class Store:
         _atomic_write(self._p(name), raw)
 
     def _load_settings(self, root: str) -> None:
-        s = self._read_json("settings.json", {})
+        from . import settings
+        s = settings.load(self.data_dir)
         self.root = root or s.get("root") or (r"E:\Sample Packs" if os.name == "nt" else "")
         self.save_settings()
 
     def save_settings(self) -> None:
-        self._write_json("settings.json", {"root": self.root})
+        from . import settings  # merges, so other settings (port, volume, ...) are kept
+        settings.update(self.data_dir, {"root": self.root})
 
     def _load(self) -> None:
         inv = self._read_json("inventory.json.gz", None)
