@@ -527,6 +527,9 @@ const Player = {
   setPlayhead(f) {
     f = Math.max(0, Math.min(1, f || 0));
     this.tp.style.setProperty('--playhead', f.toFixed(4));
+    document.documentElement.style.setProperty('--playhead', f.toFixed(4));
+    const pid = this.tp.dataset.playingId;
+    document.querySelectorAll('.ins-wave').forEach((w) => { const c = w.querySelector('canvas[data-wave-for]'); w.classList.toggle('is-live', !!pid && !!c && c.dataset.waveFor === pid); });
     this.scrub.style.setProperty('--p', (f * 100) + '%');
   },
   renderTime() {

@@ -83,6 +83,10 @@ class VTable {
     this.pages.clear();
     this.error = null;
     if (!keepScroll) { this.total = null; this.cursor = -1; this.body.scrollTop = 0; }
+    if (!keepScroll) { /* motion.css: entry animation on fresh lists only, never on scroll re-renders */
+      this.el.classList.add('vt-enter'); clearTimeout(this._enterT);
+      this._enterT = setTimeout(() => this.el.classList.remove('vt-enter'), 900);
+    }
     this.loadPage(Math.floor((keepScroll ? this.body.scrollTop / this.rh : 0) / this.o.pageSize));
     this.render();
   }
