@@ -274,8 +274,35 @@ document.addEventListener('keydown', (ev) => {
   }
 });
 
+/* ================= Theme: accent preset and reduce effects ================= */
+/* Both are per-browser preferences kept in localStorage (slo.accent, slo.reduceFx)
+   through Store, which already swallows blocked-storage errors. */
+const Theme = {
+  ACCENTS: ['magenta', 'teal', 'violet', 'amber'],
+  init() {
+    this.setAccent(Store.get('accent', 'magenta'), false);
+    this.setReduceFx(Store.get('reduceFx', false), false);
+    $$('#accent-pick [role=radio]').forEach((b) => b.addEventListener('click', () => this.setAccent(b.dataset.accent, true)));
+    segKeys($('#accent-pick'));
+    $('#btn-effects').addEventListener('click', () => this.setReduceFx(!document.documentElement.classList.contains('reduce-fx'), true));
+  },
+  setAccent(name, save) {
+    if (!this.ACCENTS.includes(name)) name = 'magenta';
+    document.documentElement.dataset.accent = name;
+    $$('#accent-pick [role=radio]').forEach((b) => b.setAttribute('aria-checked', b.dataset.accent === name ? 'true' : 'false'));
+    if (save) Store.set('accent', name);
+  },
+  setReduceFx(on, save) {
+    on = !!on;
+    document.documentElement.classList.toggle('reduce-fx', on);
+    $('#btn-effects').setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (save) Store.set('reduceFx', on);
+  },
+};
+
 /* ================= Boot ================= */
 (async function boot() {
+  Theme.init();
   await API.init();
   if (API.fixture) {
     $('#fixture-flag').hidden = false;

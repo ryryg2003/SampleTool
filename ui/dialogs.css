@@ -1,0 +1,60 @@
+/* Dialogs, toasts, and loading / empty / error states. Loaded after views.css. */
+
+/* ---------- States ---------- */
+.vt-state:empty { display: none; }
+.vt-state { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
+.vt-state > div { max-width: 46ch; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.vt-state strong { color: var(--text); font: 700 15px var(--f-label); }
+.vt-state.is-error strong { color: var(--err); }
+.loading { display: flex !important; flex-direction: row !important; gap: 4px; align-items: flex-end !important; height: 20px; }
+.loading i { width: 4px; height: 8px; background: var(--grad); border-radius: 2px; animation: vu 0.9s ease-in-out infinite; }
+.loading i:nth-child(2) { animation-delay: .15s; } .loading i:nth-child(3) { animation-delay: .3s; }
+.loading span { margin-left: 8px; color: var(--muted); font-size: 12px; }
+@keyframes vu { 0%, 100% { height: 6px; } 50% { height: 18px; } }
+.empty { padding: 24px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+.empty strong { color: var(--text); font: 700 15px var(--f-label); }
+
+/* ---------- Dialogs ---------- */
+.dlg {
+  background: color-mix(in srgb, var(--solid) 82%, transparent); color: var(--text);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--line); border-radius: var(--r-card); padding: 0;
+  width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 40px);
+  box-shadow: 0 30px 80px rgba(4, 1, 14, .6);
+}
+.dlg::backdrop { background: rgba(9, 5, 26, .62); }
+.dlg-body { padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; }
+.dlg h2 { font-size: 19px; font-weight: 800; }
+.dlg h2 .mono { color: color-mix(in srgb, var(--accent) 60%, #fff); font-size: 16px; }
+.dlg p { color: var(--muted); }
+.dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.dlg-err { background: color-mix(in srgb, var(--err) 16%, transparent); border: 1px solid color-mix(in srgb, var(--err) 50%, transparent); color: #ffdde1; padding: 8px 12px; border-radius: 10px; font-size: 12.5px; }
+.dlg-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.dlg-table th { text-align: left; font: 600 12px var(--f-label); color: var(--muted); padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.dlg-table td { padding: 5px 6px; border-bottom: 1px solid var(--line-soft); }
+.dlg-table tfoot td { border-bottom: 0; border-top: 1px solid var(--line); font-weight: 700; }
+.dlg-table .num { text-align: right; }
+.bulk-grid { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 8px 12px; align-items: center; }
+.bulk-set { display: flex; align-items: center; gap: 8px; font: 600 13px var(--f-label); cursor: pointer; }
+.bulk-ctl .input { width: 100%; }
+.keys { display: grid; grid-template-columns: 150px 1fr; gap: 7px 12px; margin: 0; }
+.keys dt { text-align: right; }
+.keys dd { margin: 0; color: var(--muted); }
+
+/* ---------- Toasts ---------- */
+.toasts { position: fixed; right: 24px; bottom: 104px; display: flex; flex-direction: column; gap: 6px; z-index: 50; pointer-events: none; max-width: 420px; }
+.toast {
+  background: color-mix(in srgb, var(--solid) 88%, transparent); color: var(--text);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--line); border-left: 3px solid var(--accent-2); padding: 9px 14px; border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(4, 1, 14, .5); font-size: 12.5px; transition: opacity .3s, transform .3s;
+}
+.toast-err { border-left-color: var(--err); }
+.toast-warn { border-left-color: var(--hold); }
+.toast.out { opacity: 0; transform: translateY(6px); }
+
+/* Reduce effects / reduced transparency: solid dialogs and toasts. */
+:root.reduce-fx .dlg, :root.reduce-fx .toast { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--solid); }
+@media (prefers-reduced-transparency: reduce) {
+  .dlg, .toast { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--solid); }
+}
