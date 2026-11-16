@@ -139,6 +139,14 @@ const Library = {
   },
   activeCount() { return Object.keys(this.filters).length + (this.q ? 1 : 0) + (this.pack ? 1 : 0) + (this.coll ? 1 : 0) + (this.newOnly ? 1 : 0); },
   setColl(c) { this.coll = c || null; this.apply(); },
+  /* Open a collection from the sidebar: show the whole collection (other filters reset). */
+  openColl(c) {
+    this.filters = {}; this.q = ''; $('#lib-q').value = '';
+    $$('#lib-filters [data-f]').forEach((el) => { el.value = ''; });
+    this.newOnly = false; this.coll = c || null;
+    if (this.pack) { this.setPack(null); return; }
+    this.apply();
+  },
   setNewOnly(on) { this.newOnly = !!on; this.apply(); },
   /* Restore a saved search (smart collection). Replaces every current filter. */
   restoreParams(p) {

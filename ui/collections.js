@@ -62,6 +62,7 @@ const Collections = {
       this.data = await API.get('/api/collections');
       this.loaded = true;
       this.renderSide();
+      if (Library.current || Library.sel.size > 1) Library.renderInspector();  // collection names may have changed
     } catch (e) {
       $('#coll-list').innerHTML = `<li class="side-msg err">Couldn't load collections: ${esc(e.message)}</li>`;
     }
@@ -109,7 +110,7 @@ const Collections = {
       return;
     }
     if (Library.coll && Library.coll.id === id) Library.setColl(null);
-    else Library.setColl({ id, name: this.name(id) || 'Collection' });
+    else Library.openColl({ id, name: this.name(id) || 'Collection' });
   },
 
   /* ---------- row patching ---------- */
