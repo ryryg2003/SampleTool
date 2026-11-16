@@ -228,9 +228,12 @@ class IdleWatcher(threading.Thread):
         self.fired = False
         track_ui_requests(app)
 
-    def should_exit(self, now: float) -> bool:
+    def idle(self, now: float) -> bool:
         last = self.app.last_ui_request
-        return last is not None and now - last > self.timeout and not busy(self.app)
+        return last is not None and now - last > self.timeout
+
+    def should_exit(self, now: float) -> bool:
+        return self.idle(now) and not busy(self.app)
 
     def run(self) -> None:
         prev = time.monotonic()
@@ -245,7 +248,8 @@ class IdleWatcher(threading.Thread):
             if not self.app.job_lock.acquire(blocking=False):
                 continue
             try:
-                if self.app.executing or self.app.progress.get("running") or not self.should_exit(time.monotonic()):
+                # we hold the job lock now, so check the rest of busy() by hand
+                if self.app.executing or self.app.progress.get("running") or not self.idle(time.monotonic()):
                     continue
                 log.info("No window has talked to the app for %ss; shutting down.", int(self.timeout))
                 self.fired = True

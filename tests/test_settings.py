@@ -300,11 +300,20 @@ class IdleShutdownTest(unittest.TestCase):
         self.assertTrue(self._stopped_within(5))
 
     def test_sleep_gap_restarts_the_clock(self):
-        w = winapp.IdleWatcher(self.httpd, self.app, 10, interval=0.05)
-        self.app.last_ui_request = time.monotonic() - 100
-        self.assertTrue(w.should_exit(time.monotonic()))
-        self.app.last_ui_request = None
-        self.assertFalse(w.should_exit(time.monotonic()))
+        """After the PC sleeps the clock jumps; the UI gets a fresh timeout to poll again."""
+        real = time.monotonic
+
+        class Clock:
+            offset = 0.0
+
+            @staticmethod
+            def monotonic():
+                return real() + Clock.offset
+        self._ui_poll()
+        with mock.patch.object(winapp, "time", Clock):
+            Clock.offset = 1000.0  # ~17 minutes asleep
+            self.assertFalse(self._stopped_within(0.15), "shut down right after wake-up")
+            self.assertTrue(self._stopped_within(5))
 
 
 class MainEntryTest(unittest.TestCase):
