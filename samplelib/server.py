@@ -46,7 +46,7 @@ UI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))
 
 AUDIO_TYPES = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg",
                ".flac": "audio/flac", ".m4a": "audio/mp4", ".aif": "audio/aiff",
-               ".aiff": "audio/aiff"}
+               ".aiff": "audio/aiff", ".aifc": "audio/aiff"}
 
 
 class App:
@@ -378,7 +378,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, k)
         m = re.fullmatch(r"/api/audio/([\w-]+)", path)
         if m:
-            return self._audio(st.by_id[m.group(1)])
+            return self._audio(st.by_id[m.group(1)], q)
         if path == "/api/plan":
             return self._plan(q)
         if path == "/api/log":
@@ -388,11 +388,19 @@ class Handler(BaseHTTPRequestHandler):
                 return None
         return self._err(404, "Unknown endpoint")
 
-    def _audio(self, it: dict):
+    def _audio(self, it: dict, q: Optional[dict] = None):
         st = self.app.store
         path = st._final_paths.get(it["id"]) or it["abs_path"]
         if not os.path.isfile(path):
             path = it["abs_path"]
+        download = (q or {}).get("download") == "1"  # original bytes, e.g. drag to DAW
+        if not download:
+            try:
+                from . import api_media
+            except ImportError:
+                api_media = None  # type: ignore
+            if api_media and api_media.serve_converted(self, it, path):  # AIFF -> WAV on the fly
+                return
         size = os.path.getsize(path)
         ctype = AUDIO_TYPES.get(it["ext"], "application/octet-stream")
         start, end = 0, size - 1
@@ -419,6 +427,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(end - start + 1))
         if status == 206:
             self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        if download:
+            from .api_media import content_disposition
+            self.send_header("Content-Disposition", content_disposition(it["name"]))
         self.end_headers()
         with open(path, "rb") as f:  # read-only
             f.seek(start)

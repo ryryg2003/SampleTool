@@ -300,6 +300,54 @@ function url(hash) {
     await shot('10-scan');
 
     // >>> media checks (owned by the media feature; insert between these lines)
+    {
+      await page.goto(url('library'));
+      await page.waitForSelector(rows, { timeout: 15000 });
+      await settle();
+      const firstRow = page.locator(rows).first();
+      await firstRow.click();
+      await settle(500);
+      const wave = await page.evaluate(() => ({ cls: document.getElementById('tp-wave').className, ph: document.getElementById('tp-wave-ph').textContent, vis: getComputedStyle(document.getElementById('tp-wave-ph')).display !== 'none', w: document.getElementById('tp-wave-c').width }));
+      check('waveform area renders a placeholder', wave.vis && wave.ph.length > 0 && wave.w > 0, JSON.stringify(wave));
+      check('scrub stays an accessible range control', await page.evaluate(() => { const s = document.getElementById('tp-scrub'); return s.type === 'range' && s.getAttribute('aria-label') === 'Playback position'; }));
+      await page.locator('#lib-table .vt-body').focus();
+      const os0 = await page.getAttribute('#tp-oneshot', 'aria-pressed');
+      await page.keyboard.press('o');
+      check('O toggles retrigger', (await page.getAttribute('#tp-oneshot', 'aria-pressed')) !== os0);
+      check('retrigger persisted', await page.evaluate(() => localStorage.getItem('slo.oneshot') === String(document.getElementById('tp-oneshot').getAttribute('aria-pressed') === 'true')));
+      if ((await page.getAttribute('#tp-oneshot', 'aria-pressed')) !== 'true') await page.click('#tp-oneshot');
+      check('retrigger turns on arrow auditions', await page.evaluate(() => Player.autoOn()));
+      const c0 = await page.evaluate(() => Library.table.cursor);
+      await page.keyboard.press('ArrowDown');
+      await settle(200);
+      check('arrows still move with retrigger on', (await page.evaluate(() => Library.table.cursor)) === c0 + 1);
+      await page.click('#tp-oneshot');
+      check('retrigger button toggles off', (await page.getAttribute('#tp-oneshot', 'aria-pressed')) === 'false');
+      const drag = await page.evaluate(() => {
+        const el = document.querySelector('#lib-table .vt-row:not(.is-ph)');
+        const dt = new DataTransfer();
+        el.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
+        const out = { draggable: el.getAttribute('draggable'), dl: dt.getData('DownloadURL'), uri: dt.getData('text/uri-list'), txt: dt.getData('text/plain') };
+        el.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+        return out;
+      });
+      check('rows are draggable', drag.draggable === 'true');
+      check('dragstart sets DownloadURL to the original file', /^[\w/-]+:[^:]+:http:\/\/127\.0\.0\.1:\d+\/api\/audio\/[\w-]+\?download=1$/.test(drag.dl), drag.dl);
+      check('dragstart sets uri-list and path', drag.uri.startsWith('file:///') && drag.txt.length > 3, drag.uri + ' | ' + drag.txt);
+      await settle(200);
+      check('table renders after drag', (await page.locator(rows).count()) > 0);
+      check('inspector offers copy file to clipboard', (await page.locator('#ins-clipfile').count()) === 1);
+      await page.keyboard.press('?');
+      check('keys dialog lists retrigger', /Retrigger/.test(await page.textContent('#keys-dlg')));
+      await page.keyboard.press('Escape');
+      check('no horizontal page overflow (deck)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await shot('11-media-deck');
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await settle(300);
+      await shot('11-media-deck-1920');
+      await page.setViewportSize({ width: 1366, height: 768 });
+      await settle(200);
+    }
     // <<< media checks
     //
     //

@@ -178,10 +178,13 @@ const Player = {
     this.vol = $('#tp-vol');
     this.loopBtn = $('#tp-loop');
     this.auto = $('#tp-auto');
+    this.oneShotBtn = $('#tp-oneshot');
     const vol = Store.get('volume', 80);
     this.vol.value = vol; this.audio.volume = vol / 100;
     this.setLoop(Store.get('loop', false));
     this.auto.checked = Store.get('auto', false);
+    this.setOneShot(Store.get('oneshot', false));
+    if (this.oneShotBtn) this.oneShotBtn.addEventListener('click', () => this.setOneShot(!this.oneShot));
     this.vol.addEventListener('input', () => { this.audio.volume = this.vol.value / 100; Store.set('volume', +this.vol.value); });
     this.btn.addEventListener('click', () => this.toggle());
     this.loopBtn.addEventListener('click', () => this.setLoop(!this.audio.loop));
@@ -193,14 +196,20 @@ const Player = {
     });
     this.scrub.addEventListener('change', () => { this.scrubbing = false; });
     this.audio.addEventListener('timeupdate', () => this.renderTime());
-    this.audio.addEventListener('loadedmetadata', () => { this.scrub.disabled = false; this.renderTime(); });
+    this.audio.addEventListener('loadedmetadata', () => {
+      this.scrub.disabled = false;
+      if (this.pendingSeek !== null && isFinite(this.audio.duration)) { this.audio.currentTime = this.pendingSeek * this.audio.duration; this.pendingSeek = null; }
+      this.renderTime();
+    });
     this.audio.addEventListener('play', () => this.renderState());
     this.audio.addEventListener('pause', () => this.renderState());
     this.audio.addEventListener('ended', () => this.renderState());
     this.audio.addEventListener('error', () => {
       if (!this.row || !this.audio.getAttribute('src')) return;
-      this.msg(`Could not play ${this.row.name}. The file may have moved or uses an encoding this browser can't decode.`, 'err');
+      const row = this.row;
+      this.msg(`Could not play ${row.name}. The file may have moved or uses an encoding this browser can't decode.`, 'err', this.revealAction(row));
       this.renderState();
+      if (Player.CONVERTED.includes(row.ext)) this.explainConvertError(row);
     });
   },
   setLoop(on) {
@@ -208,12 +217,53 @@ const Player = {
     this.loopBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
     Store.set('loop', !!on);
   },
-  autoOn() { return this.auto.checked; },
+  CONVERTED: ['.aif', '.aiff', '.aifc'],  // served as WAV converted on the fly by the server
+  pendingSeek: null,
+  oneShot: false,
+  /* Retrigger mode: every arrow-key move stops the current sound and restarts
+     the newly selected row from 0 (also when the row did not change). */
+  setOneShot(on) {
+    this.oneShot = !!on;
+    if (this.oneShotBtn) this.oneShotBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    Store.set('oneshot', !!on);
+  },
+  toggleOneShot() { this.setOneShot(!this.oneShot); toast('Retrigger on arrows ' + (this.oneShot ? 'on' : 'off')); },
+  autoOn() { return this.auto.checked || this.oneShot; },
+  revealAction(row) { return row && row.id ? { label: 'Show in Explorer', fn: () => reveal({ id: row.id }) } : null; },
+  async explainConvertError(row) {
+    try {
+      const r = await fetch(API.audioUrl(row.id), { headers: { Range: 'bytes=0-0' }, cache: 'no-store' });
+      if (r.ok || !this.row || this.row.id !== row.id) return;
+      const j = await r.json().catch(() => null);
+      if (j && j.error) this.msg(`Can't preview ${row.name}: ${j.error}`, 'warn', this.revealAction(row));
+    } catch (e) { /* keep the generic message */ }
+  },
+  /* Seek to a fraction 0..1 of the loaded sample; starts playback if nothing is loaded yet. */
+  seekFrac(f) {
+    f = Math.max(0, Math.min(1, f));
+    const a = this.audio;
+    if (!this.row) return;
+    if (a.getAttribute('src') && a.duration && isFinite(a.duration)) {
+      a.currentTime = f * a.duration;
+      this.renderTime();
+      if (a.paused) this.play(null, false);
+      return;
+    }
+    if (!this.playable(this.row)) { this.renderState(); return; }
+    this.pendingSeek = f;
+    this.play(null, false);
+  },
   toggleAuto() { this.auto.checked = !this.auto.checked; Store.set('auto', this.auto.checked); toast('Auto-play on arrows ' + (this.auto.checked ? 'on' : 'off')); },
-  msg(text, kind) {
+  msg(text, kind, action) {
     const m = $('#tp-msg');
     m.textContent = text || '';
-    m.className = 'tp-msg' + (kind ? ' tp-msg-' + kind : '');
+    m.className = 'tp-msg' + (kind ? ' tp-msg-' + kind : '') + (action ? ' has-act' : '');
+    if (text && action) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'tp-msg-act'; b.textContent = action.label;
+      b.addEventListener('click', action.fn);
+      m.append(' ', b);
+    }
   },
   load(row) {
     this.row = row;
@@ -221,6 +271,7 @@ const Player = {
     $('#tp-name').title = row ? row.abs_path || row.name : '';
     $('#tp-dur').textContent = '/ ' + Fmt.dur(row && row.duration_s);
     this.msg('');
+    this.pendingSeek = null;
     this.audio.pause();
     this.audio.removeAttribute('src');
     this.scrub.value = 0; this.scrub.disabled = true;
@@ -229,7 +280,12 @@ const Player = {
   playable(row) {
     if (!row) return false;
     if (row.kind && row.kind !== 'audio') { this.msg(`${row.name} is not audio (${row.ext || row.kind}).`, 'info'); return false; }
-    if (row.preview === 'unsupported') { this.msg(`Preview not supported in browser for ${row.ext}. Open it in your DAW or reveal it in Explorer.`, 'warn'); return false; }
+    if (row.preview === 'unsupported') {
+      const rex = ['.rex', '.rx2'].includes((row.ext || '').toLowerCase());
+      this.msg(rex ? `Preview not supported in browser for ${row.ext}. REX/RX2 loops play in your DAW.`
+        : `Preview not supported in browser for ${row.ext}. Open it in your DAW.`, 'warn', this.revealAction(row));
+      return false;
+    }
     if (row.preview === 'none') { this.msg(`No preview for ${row.ext}.`, 'info'); return false; }
     if (API.fixture) { this.msg('Audio unavailable in fixture mode. The player works with your real library.', 'info'); return false; }
     return true;
@@ -239,7 +295,8 @@ const Player = {
     row = this.row;
     if (!this.playable(row)) { this.renderState(); return; }
     if (!this.audio.getAttribute('src')) this.audio.src = API.audioUrl(row.id);
-    if (fromStart) this.audio.currentTime = 0;
+    if (fromStart && this.oneShot && !this.audio.paused) this.audio.pause();  // retrigger: cut the tail now
+    if (fromStart) { this.pendingSeek = null; this.audio.currentTime = 0; }
     const p = this.audio.play();
     if (p && p.catch) p.catch((e) => { if (e.name !== 'AbortError') this.msg('Playback failed: ' + e.message, 'err'); });
   },
