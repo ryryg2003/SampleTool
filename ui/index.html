@@ -13,7 +13,6 @@
 <link rel="stylesheet" href="media.css">
 <link rel="stylesheet" href="collections.css">
 <link rel="stylesheet" href="undo.css">
-<link rel="stylesheet" href="findsounds.css">
 <link rel="stylesheet" href="settings.css">
 <link rel="stylesheet" href="motion.css">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -53,7 +52,6 @@
     <button class="rail-btn" data-view="library" aria-label="Library"><svg><use href="#i-library"/></svg><span>Library</span></button>
     <button class="rail-btn" data-view="starter" aria-label="Beat Starter"><svg><use href="#i-spark"/></svg><span>Starter</span></button>
     <button class="rail-btn" data-view="log" aria-label="Move Log"><svg><use href="#i-log"/></svg><span>Move Log</span></button>
-    <button class="rail-btn" data-view="find" aria-label="Find Sounds"><svg><use href="#i-search"/></svg><span>Find Sounds</span></button>
     <button class="rail-btn" data-view="settings" aria-label="Settings"><svg><use href="#i-gear"/></svg><span>Settings</span></button>
     <div class="rail-foot">
       <span class="fixture-flag" id="fixture-flag" hidden title="Fake data in memory. Nothing on disk is read or changed.">Fixture data</span>
@@ -252,9 +250,6 @@
       <ul class="bs-saved" id="bs-saved"></ul>
     </section>
 
-    <!-- ============ FIND SOUNDS (ui/findsounds.js) ============ -->
-    <section class="view view-find" id="view-find" aria-labelledby="find-h" hidden></section>
-
     <!-- ============ SETTINGS (ui/settings.js) ============ -->
     <section class="view view-settings" id="view-settings" aria-labelledby="settings-h" hidden></section>
 
@@ -420,7 +415,6 @@
 <script src="media.js"></script>
 <script src="collections.js"></script>
 <script src="undo.js"></script>
-<script src="findsounds.js"></script>
 <script src="settings.js"></script>
 <script src="app.js"></script>
 </body>

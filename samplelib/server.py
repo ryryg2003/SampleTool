@@ -25,7 +25,7 @@ from .store import Store
 #   post(handler, path, b) -> bool  return True when it handled (and answered) the POST
 #   MUTATING: set[str]              POST paths refused while an approved run is executing
 #   state(app) -> dict              extra keys merged into GET /api/state
-EXTENSION_NAMES = ("undo", "media", "collections", "freesound", "settings")
+EXTENSION_NAMES = ("undo", "media", "collections", "settings")
 
 
 def _load_extensions() -> list:

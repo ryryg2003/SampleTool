@@ -1,5 +1,5 @@
 /* settings.js: Settings view (collection folder, port, playback defaults, density,
-   Freesound key, app info), row density for every VTable, the version line in the
+   app info), row density for every VTable, the version line in the
    keyboard dialog, and the "already open" toast after a second launch. */
 'use strict';
 
@@ -77,12 +77,15 @@ const Settings = {
   init() {
     const v = $('#view-settings');
     v.innerHTML = `
-      <header class="view-head">
-        <h1 id="settings-h">Settings</h1>
-        <p class="view-sub">Saved in the app's data folder. Nothing here changes your sample files.</p>
+      <header class="view-head head-card vh-card">
+        <div class="vh-text">
+          <span class="vh-eyebrow">Settings</span>
+          <h1 id="settings-h">Settings</h1>
+          <p class="view-sub">Saved in the app's data folder. Nothing here changes your sample files.</p>
+        </div>
       </header>
       <div class="set-body">
-        <section class="panel set-sec" aria-labelledby="set-col-h">
+        <section class="panel glass set-sec" aria-labelledby="set-col-h">
           <h2 class="set-h" id="set-col-h">Collection folder</h2>
           <label class="field-label" for="set-root">Folder that holds your sample packs</label>
           <div class="set-row">
@@ -93,7 +96,7 @@ const Settings = {
           <p class="note note-warn" id="set-busy" hidden></p>
         </section>
 
-        <section class="panel set-sec" aria-labelledby="set-play-h">
+        <section class="panel glass set-sec" aria-labelledby="set-play-h">
           <h2 class="set-h" id="set-play-h">Playback</h2>
           <div class="set-grid">
             <label class="field-label" for="set-vol">Default volume</label>
@@ -109,7 +112,7 @@ const Settings = {
           <p class="set-help">Used when the app opens. Changes you make in the player bar last until the window closes.</p>
         </section>
 
-        <section class="panel set-sec" aria-labelledby="set-disp-h">
+        <section class="panel glass set-sec" aria-labelledby="set-disp-h">
           <h2 class="set-h" id="set-disp-h">Display</h2>
           <div class="set-grid">
             <span class="field-label" id="set-dens-l">Density</span>
@@ -123,7 +126,7 @@ const Settings = {
           </div>
         </section>
 
-        <section class="panel set-sec" aria-labelledby="set-port-h">
+        <section class="panel glass set-sec" aria-labelledby="set-port-h">
           <h2 class="set-h" id="set-port-h">Startup</h2>
           <div class="set-grid">
             <label class="field-label" for="set-port">Port</label>
@@ -137,12 +140,8 @@ const Settings = {
           <p class="set-msg err" id="set-port-err" role="alert" hidden></p>
         </section>
 
-        <section class="panel set-sec" aria-labelledby="set-fs-h">
-          <h2 class="set-h" id="set-fs-h">Freesound</h2>
-          <div id="set-fs"><p class="dim">Checking…</p></div>
-        </section>
 
-        <section class="panel set-sec" aria-labelledby="set-about-h">
+        <section class="panel glass set-sec" aria-labelledby="set-about-h">
           <h2 class="set-h" id="set-about-h">About</h2>
           <dl class="set-kv" id="set-about"></dl>
         </section>
@@ -228,7 +227,6 @@ const Settings = {
     this.render();
     try { this.data = await API.get('/api/settings'); this.render(); }
     catch (e) { $('#set-about').innerHTML = `<dt>Error</dt><dd class="err">${esc(e.message)}</dd>`; }
-    this.loadFreesound();
     if (Shell.progress) this.setBusy(Shell.progress);
   },
 
@@ -280,45 +278,6 @@ const Settings = {
     }
     errEl.hidden = true; el.removeAttribute('aria-invalid');
     if (await this.save({ port: n })) toast(`Port ${n} saved. It applies the next time you start the app.`);
-  },
-
-  /* ---------- Freesound key (endpoints owned by the Freesound add-on) ---------- */
-  async loadFreesound() {
-    const box = $('#set-fs');
-    const na = '<p class="dim" id="set-fs-na">Freesound add-on not available in this version.</p>';
-    // Without the add-on's view there is no server route either; skip the request (a 404 logs a console error).
-    if (!App.views.find) { box.innerHTML = na; return; }
-    let s;
-    try { s = await API.get('/api/freesound/status'); }
-    catch (e) {
-      box.innerHTML = e.status === 404
-        ? na
-        : `<p class="err">Could not check Freesound: ${esc(e.message)}</p>`;
-      return;
-    }
-    const oauth = s.oauth || {};
-    box.innerHTML = `
-      <p class="set-fs-status"><span class="set-dot ${s.has_key ? 'on' : ''}" aria-hidden="true"></span>
-        ${s.has_key ? `API key saved <span class="mono dim">${esc(s.key_hint || '')}</span>` : 'No API key saved'}
-        ${s.online === false ? '<span class="pill">Offline</span>' : ''}
-        ${oauth.available ? `<span class="dim">· Account ${oauth.connected ? 'connected' : 'not connected'}</span>` : ''}</p>
-      <label class="field-label" for="set-fs-key">API key</label>
-      <div class="set-row">
-        <input id="set-fs-key" class="input mono set-key" type="password" autocomplete="off" spellcheck="false" placeholder="${s.has_key ? 'Enter a new key to replace it' : 'Paste your Freesound API key'}">
-        <button class="btn" id="set-fs-save" type="button">Save key</button>
-        ${s.has_key ? '<button class="btn btn-danger-ghost" id="set-fs-clear" type="button">Remove key</button>' : ''}
-      </div>
-      <p class="set-help">The key is stored only in the app's data folder and is sent only to freesound.org.</p>`;
-    $('#set-fs-save').addEventListener('click', () => this.saveKey($('#set-fs-key').value.trim()));
-    $('#set-fs-key').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); this.saveKey($('#set-fs-key').value.trim()); } });
-    const c = $('#set-fs-clear'); if (c) c.addEventListener('click', () => this.saveKey(''));
-  },
-  async saveKey(key) {
-    try {
-      const r = await API.post('/api/freesound/key', { key });
-      toast(r.has_key ? 'Freesound key saved' : 'Freesound key removed');
-      this.loadFreesound();
-    } catch (e) { toast('Could not save the key: ' + e.message, 'err'); }
   },
 
   /* ---------- Switch collection (reuses POST /api/scan {root}) ---------- */

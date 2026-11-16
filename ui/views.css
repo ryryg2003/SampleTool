@@ -10,7 +10,7 @@
   background: none; border-color: transparent; box-shadow: none;
   -webkit-backdrop-filter: none; backdrop-filter: none; border-radius: 0; overflow: visible;
 }
-.view-scan, .view-review, .view-log { padding: 0; gap: var(--gap); }
+.view-scan, .view-review, .view-log, .view-settings { padding: 0; gap: var(--gap); }
 .view-review, .view-log { overflow: visible; }
 
 /* ---------- Header card (shared .head-card from app.css) ---------- */

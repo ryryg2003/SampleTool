@@ -622,9 +622,9 @@ class TestPlanner(unittest.TestCase):
         self.assertEqual(o["canonical"], lib["abs_path"])
 
     def test_license_sidecar_travels_with_its_sound(self):
-        snd = self.c.add("_Freesound/alice/Kick Thump.wav", uniq(7))
-        side = self.c.add("_Freesound/alice/Kick Thump.wav.license.txt", b"CC0 by alice")
-        lone = self.c.add("_Freesound/alice/zzqx.wav.license.txt", b"orphan")
+        snd = self.c.add("_CC0/alice/Kick Thump.wav", uniq(7))
+        side = self.c.add("_CC0/alice/Kick Thump.wav.license.txt", b"CC0 by alice")
+        lone = self.c.add("_CC0/alice/zzqx.wav.license.txt", b"orphan")
         ks, p = self.plan()
         ops = self.ops_by_item(p)
         self.assertEqual(ops[snd["id"]]["action"], "move")

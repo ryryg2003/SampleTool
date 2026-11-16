@@ -351,7 +351,7 @@ SIDECAR_SUFFIX = ".license.txt"
 
 
 def _attach_sidecars(ops, incoming, move_op_of, taken) -> None:
-    """Let ``<sound>.license.txt`` (written by Find Sounds) travel with its sound.
+    """Let ``<sound>.license.txt`` travel with its sound.
 
     A sidecar that would otherwise be kept in place becomes a move to
     ``<sound destination>.license.txt`` when its sound (same folder) is moved and

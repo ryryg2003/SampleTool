@@ -107,8 +107,5 @@ are attached to the workflow as artifacts.
 
 ## Roadmap and docs
 
-- **Find Sounds** is built (v1.0): search Freesound for CC0 sounds from inside
-  the app. Research, API facts and design notes:
-  [`docs/FREE_SOUNDS_ADDON.md`](docs/FREE_SOUNDS_ADDON.md).
 - `docs/UI_PLAN.md`: the Prism Aurora design reference (image, color tokens,
   components, motion). All UI work follows it.

@@ -17,7 +17,6 @@
 .set-range { flex: 1; max-width: 280px; accent-color: var(--amber); }
 .set-out { min-width: 3ch; text-align: right; color: var(--amber); }
 .set-port { width: 96px; }
-.set-key { flex: 1; max-width: 460px; }
 
 .set-kv { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 6px 12px; margin: 0; align-items: center; }
 .set-kv dt { font: 500 12.5px var(--f-label); color: var(--muted); }
@@ -25,9 +24,6 @@
 .set-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .dlg .set-kv dd { display: block; }
 
-.set-fs-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.set-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex: none; }
-.set-dot.on { background: var(--ok); box-shadow: 0 0 6px rgba(130, 201, 145, .55); }
 
 .keys-ver { color: var(--dim); font-size: 12px; border-top: 1px solid var(--line-soft); padding-top: 10px; }
 .keys-ver .mono { color: var(--muted); }
