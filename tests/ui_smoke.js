@@ -356,6 +356,43 @@ function url(hash) {
     //
     //
     // >>> undo checks (owned by the undo feature; insert between these lines)
+    await page.click('.rail-btn[data-view="log"]');
+    await settle(700);
+    check('undo button exists in Move Log', (await page.locator('#view-log #log-undo').count()) === 1);
+    if (fixture) {
+      check('undo button visible and enabled', (await page.isVisible('#log-undo')) && (await page.isEnabled('#log-undo')));
+      await page.click('#log-undo');
+      await page.waitForSelector('#undo-dlg[open]', { timeout: 5000 });
+      check('undo dialog lists moves and links', /moved back/.test(await page.textContent('#undo-table')) && /kit hard link/.test(await page.textContent('#undo-table')));
+      await shot('11-undo-dialog');
+      await page.click('#undo-go');
+      await page.waitForFunction(() => location.hash === '#review', null, { timeout: 10000 });
+      await page.waitForSelector('#undo-banner:not([hidden])', { timeout: 10000 });
+      await settle(700);
+      check('undo plan banner renders', /Undo plan/.test(await page.textContent('#undo-banner')) && /go back to their original folders/.test(await page.textContent('#undo-banner')));
+      check('undo plan cards', /move back/.test(await page.textContent('#plan-cards')) && /remove kit link/.test(await page.textContent('#plan-cards')));
+      check('rebuild button names the undo plan', /undo/i.test(await page.textContent('#plan-build')));
+      check('undo columns relabelled', /Goes back to/.test(await page.textContent('#op-table .vt-head')));
+      const acts = await page.$$eval('#op-table .vt-row:not(.is-ph) .act', (b) => b.map((x) => x.textContent));
+      check('undo ops use undo actions only', acts.length > 0 && acts.every((a) => ['Move', 'Unlink', 'Hold', 'Keep'].includes(a)), acts.slice(0, 8).join(','));
+      await page.selectOption('#op-action', 'move');
+      await settle(500);
+      const mv = await page.$$eval('#op-table .vt-row:not(.is-ph) .act', (b) => b.map((x) => x.textContent));
+      check('undo moves back listed', mv.length > 0 && mv.every((a) => a === 'Move'), mv.slice(0, 4).join(','));
+      await page.selectOption('#op-action', '');
+      await settle(400);
+      check('no horizontal page overflow (undo review)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await page.click('#op-table .vt-row:not(.is-ph)');
+      await settle(300);
+      check('undo op detail shows where it goes back', /Goes back to|File stays at/.test(await page.textContent('#op-detail')));
+      await shot('12-undo-review');
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await settle(500);
+      check('no horizontal page overflow (undo review 1920)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await shot('12-undo-review-1920');
+      await page.setViewportSize({ width: 1366, height: 768 });
+      await settle(300);
+    }
     // <<< undo checks
     //
     //

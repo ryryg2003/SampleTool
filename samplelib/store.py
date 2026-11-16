@@ -375,9 +375,16 @@ class Store:
             self.execution = ex
             self._write_json("execution.json.gz", ex)
             self._index_results()
+            # Undo: keep a run history record that survives rescans and restarts.
+            if self.plan and self.plan.get("kind") != "undo":
+                from . import undo
+                undo.record_run(self, self.plan, ex)
 
     def _index_results(self) -> None:
         fp = {}
+        if (self.plan or {}).get("kind") == "undo":  # files went back to their scanned paths
+            self._final_paths = {}
+            return
         ops = {o["id"]: o for o in (self.plan or {}).get("ops", [])}
         for r in (self.execution or {}).get("results", []):
             o = ops.get(r.get("op_id"))

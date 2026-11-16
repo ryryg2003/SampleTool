@@ -163,6 +163,9 @@ class App:
             if st.approved_hash != plan_hash or not st.plan or st.plan["plan_hash"] != plan_hash or st.plan_stale:
                 raise PermissionError("Plan is not approved")
             plan = st.plan
+        if plan.get("kind") == "undo":  # reverse plan from samplelib/undo.py
+            from . import undo
+            return undo.run_undo(self, plan, plan_hash)
         self.set_progress({"job": "execute", "phase": "executing", "total": len(plan["ops"])})
         results = executor.execute(plan, st.journal_path(plan_hash), self.set_progress, self.cancel)
         ex = {"plan_hash": plan_hash, "ts": time.time(), "results": results,

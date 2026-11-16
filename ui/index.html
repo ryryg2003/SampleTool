@@ -205,10 +205,20 @@
 
     <!-- ============ MOVE LOG ============ -->
     <section class="view view-log" id="view-log" aria-labelledby="log-h" hidden>
-      <header class="view-head">
-        <h1 id="log-h">Move log</h1>
-        <p class="view-sub" id="log-meta">What happened to each file when the approved plan ran.</p>
+      <header class="view-head review-head">
+        <div>
+          <h1 id="log-h">Move log</h1>
+          <p class="view-sub" id="log-meta">What happened to each file when the approved plan ran.</p>
+        </div>
+        <div class="head-actions">
+          <span class="undo-state" id="undo-state"></span>
+          <button class="btn" id="log-undo" type="button" hidden>Undo this run…</button>
+        </div>
       </header>
+      <div class="banner banner-undo" id="undo-rescan" role="status" hidden>
+        <strong>Files were put back.</strong> <span>The library list still shows the state before the undo. Rescan before you build a new plan.</span>
+        <button class="btn btn-small" id="undo-rescan-go" type="button">Rescan now</button>
+      </div>
       <div class="log-top">
         <div class="panel verify" id="verify"></div>
         <div class="panel reports" id="reports"></div>
