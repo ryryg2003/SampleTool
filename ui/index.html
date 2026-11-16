@@ -58,12 +58,15 @@
   <main class="stage glass" id="stage">
     <!-- ============ SCAN ============ -->
     <section class="view view-scan" id="view-scan" aria-labelledby="scan-h" hidden>
-      <header class="view-head">
-        <h1 id="scan-h">Scan</h1>
-        <p class="view-sub">Read every file under your packs folder and work out what each sound is.</p>
+      <header class="view-head head-card vh-card">
+        <div class="vh-text">
+          <span class="vh-eyebrow">Read only</span>
+          <h1 id="scan-h">Scan</h1>
+          <p class="view-sub">Read every file under your packs folder and work out what each sound is.</p>
+        </div>
       </header>
       <div class="scan-body">
-        <form class="scan-form panel" id="scan-form">
+        <form class="scan-form panel glass" id="scan-form">
           <label for="scan-root" class="field-label">Packs folder</label>
           <div class="scan-row">
             <input id="scan-root" class="input input-path" type="text" spellcheck="false" autocomplete="off">
@@ -72,7 +75,7 @@
           </div>
           <p class="scan-promise"><span class="lock" aria-hidden="true"></span><span>Scanning only reads. It never moves, renames, tags or writes anything inside this folder. Results are stored in the app's own data folder<span id="scan-datadir"></span>.</span></p>
         </form>
-        <div class="panel scan-progress" id="scan-progress" hidden>
+        <div class="panel glass scan-progress" id="scan-progress" hidden>
           <div class="sp-top">
             <span class="sp-phase" id="sp-phase">walking</span>
             <span class="sp-count mono" id="sp-count">0 / 0</span>
@@ -92,8 +95,9 @@
 
     <!-- ============ REVIEW ============ -->
     <section class="view view-review" id="view-review" aria-labelledby="review-h" hidden>
-      <header class="view-head review-head">
-        <div>
+      <header class="view-head review-head head-card vh-card">
+        <div class="vh-text">
+          <span class="vh-eyebrow">Before anything moves</span>
           <h1 id="review-h">Review plan</h1>
           <p class="view-sub" id="plan-meta">No plan yet.</p>
         </div>
@@ -133,17 +137,17 @@
           <span class="count mono" id="op-count"></span>
         </div>
         <div class="split">
-          <div class="vt" id="op-table"></div>
-          <aside class="op-detail panel" id="op-detail" aria-label="Operation details" hidden></aside>
+          <div class="vt glass" id="op-table"></div>
+          <aside class="op-detail panel glass" id="op-detail" aria-label="Operation details" hidden></aside>
         </div>
       </div>
       <div class="rpane rpane-kits" id="rpane-kits" role="tabpanel" aria-labelledby="rtab-kits" hidden>
-        <div class="kits-list">
+        <div class="kits-list glass">
           <div class="search search-sm"><svg aria-hidden="true"><use href="#i-search"/></svg><input class="input" id="kit-q" type="search" placeholder="Find kit" aria-label="Search kits"></div>
           <ul id="kit-list" class="list" role="listbox" aria-label="Kits"></ul>
           <p class="hint">To make a new kit, select samples in Library and choose <em>Create kit</em>.</p>
         </div>
-        <div class="kit-detail panel" id="kit-detail"></div>
+        <div class="kit-detail panel glass" id="kit-detail"></div>
       </div>
     </section>
 
@@ -204,13 +208,16 @@
 
     <!-- ============ MOVE LOG ============ -->
     <section class="view view-log" id="view-log" aria-labelledby="log-h" hidden>
-      <header class="view-head">
-        <h1 id="log-h">Move log</h1>
-        <p class="view-sub" id="log-meta">What happened to each file when the approved plan ran.</p>
+      <header class="view-head head-card vh-card">
+        <div class="vh-text">
+          <span class="vh-eyebrow">After the run</span>
+          <h1 id="log-h">Move log</h1>
+          <p class="view-sub" id="log-meta">What happened to each file when the approved plan ran.</p>
+        </div>
       </header>
       <div class="log-top">
-        <div class="panel verify" id="verify"></div>
-        <div class="panel reports" id="reports"></div>
+        <div class="panel glass verify" id="verify"></div>
+        <div class="panel glass reports" id="reports"></div>
       </div>
       <div class="toolbar">
         <div class="seg" role="radiogroup" aria-label="Filter by status" id="log-status">
@@ -224,7 +231,7 @@
         <div class="search search-sm"><svg aria-hidden="true"><use href="#i-search"/></svg><input class="input" id="log-q" type="search" placeholder="Filter by name, path or error" aria-label="Search move log"></div>
         <span class="count mono" id="log-count"></span>
       </div>
-      <div class="vt" id="log-table"></div>
+      <div class="vt glass" id="log-table"></div>
     </section>
   </main>
 

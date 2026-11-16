@@ -30,7 +30,7 @@ const Review = {
     };
     this.groupKey = groupKey;
     this.table = new VTable($('#op-table'), {
-      label: 'Planned operations', rowHeight: 30, pageSize: 200,
+      label: 'Planned operations', rowHeight: 50, pageSize: 200,
       columns: [
         { key: 'g', label: 'Group', width: 'minmax(80px, .6fr)', cls: 'c-grp', title: (o) => groupKey(o), render: (o, i, prev) => { const g = groupKey(o); return !prev || groupKey(prev) !== g ? `<span class="ellip">${esc(g)}</span>` : '<span class="ditto" aria-hidden="true"></span>'; } },
         { key: 'a', label: 'Action', width: '66px', render: (o) => actionBadge(o.action) },
@@ -39,7 +39,7 @@ const Review = {
         { key: 'dst', label: 'Proposed', width: 'minmax(110px, 1.3fr)', cls: 'c-path c-dest', title: (o) => o.dest || o.canonical || o.reason, render: (o) => o.dest ? `<span class="ellip">${esc(relDest(o.dest))}</span>` : `<span class="ellip dim">${o.action === 'keep' ? 'stays; copy kept at ' + esc(relDest(o.canonical)) : 'stays where it is'}</span>` },
         { key: 'why', label: 'Reason', width: 'minmax(150px, 1.6fr)', cls: 'c-why', title: (o) => o.reason, render: (o) => `${flagList(o.flags)}<span class="ellip dim">${esc(o.reason || '')}</span>` },
       ],
-      rowClass: (o, i, prev) => (prev && groupKey(prev) !== groupKey(o) ? 'grp-start' : ''),
+      rowClass: (o, i, prev) => `row-act-${esc(o.action || 'keep')}${prev && groupKey(prev) !== groupKey(o) ? ' grp-start' : ''}`,
       fetch: (offset, limit) => API.get('/api/plan', { group: this.group, action: this.action, flag: this.flag, q: this.q, offset, limit }).then((r) => Object.assign(r, { items: r.items || r.ops || [] })),
       onTotal: (t, res) => { $('#op-count').textContent = Fmt.num(t) + ' operations'; this.planRes = res; this.syncPlan(res); },
       onRowClick: (i, o) => this.showOp(o),
@@ -125,17 +125,21 @@ const Review = {
     const box = $('#plan-cards');
     if (!p || !p.summary) { box.innerHTML = ''; return; }
     const s = p.summary, ba = s.by_action || {}, bb = s.bytes_by_action || {};
-    const card = (k, v, sub, cls, act) => `<button type="button" class="card ${cls || ''}${act && this.action === act ? ' on' : ''}" ${act ? `data-act="${act}"` : 'disabled'}><span class="card-v mono">${v}</span><span class="card-k">${k}</span>${sub ? `<span class="card-s mono">${sub}</span>` : ''}</button>`;
+    // Stat tiles: action tiles are filters on the action color; the bar is that action's share of all files.
+    const tot = s.total_files || 0;
+    const share = (n) => (tot ? Math.min(100, Math.round((n || 0) / tot * 100)) : 0);
+    const card = (k, v, sub, cls, act, pct) => `<button type="button" class="card ${cls || ''}${act && this.action === act ? ' on' : ''}" ${act ? `data-act="${act}" aria-pressed="${this.action === act}"` : 'disabled'}><span class="card-k">${k}</span><span class="card-v mono">${v}</span>${sub ? `<span class="card-s mono">${sub}</span>` : ''}<span class="card-bar" aria-hidden="true"><i style="--p:${pct || 0}%"></i></span></button>`;
     box.innerHTML = [
-      card('files in plan', Fmt.num(s.total_files), Fmt.bytes(s.total_bytes), 'card-total'),
-      card('move', Fmt.num(ba.move || 0), bb.move !== undefined ? Fmt.bytes(bb.move) : '', 'c-move', 'move'),
-      card('link (kit copies)', Fmt.num(ba.link || 0), bb.link !== undefined ? Fmt.bytes(bb.link) + ' not copied' : '', 'c-link', 'link'),
-      card('keep in place', Fmt.num(ba.keep || 0), 'duplicates', 'c-keep', 'keep'),
-      card('held for review', Fmt.num(ba.hold || 0), 'not touched', 'c-hold', 'hold'),
-      card('excluded', Fmt.num(ba.exclude || 0), '', 'c-exclude', 'exclude'),
-      card('duplicate groups', Fmt.num(s.duplicate_groups), Fmt.bytes(s.duplicate_bytes_avoided) + ' avoided'),
-      card('name collisions', Fmt.num(s.collisions), 'renamed with pack'),
+      card('files in plan', Fmt.num(s.total_files), Fmt.bytes(s.total_bytes), 'card-total', '', tot ? 100 : 0),
+      card('move', Fmt.num(ba.move || 0), bb.move !== undefined ? Fmt.bytes(bb.move) : '', 'c-move', 'move', share(ba.move)),
+      card('link (kit copies)', Fmt.num(ba.link || 0), bb.link !== undefined ? Fmt.bytes(bb.link) + ' not copied' : '', 'c-link', 'link', share(ba.link)),
+      card('keep in place', Fmt.num(ba.keep || 0), 'duplicates', 'c-keep', 'keep', share(ba.keep)),
+      card('held for review', Fmt.num(ba.hold || 0), 'not touched', 'c-hold', 'hold', share(ba.hold)),
+      card('excluded', Fmt.num(ba.exclude || 0), '', 'c-exclude', 'exclude', share(ba.exclude)),
+      card('duplicate groups', Fmt.num(s.duplicate_groups), Fmt.bytes(s.duplicate_bytes_avoided) + ' avoided', 'card-info', '', s.total_bytes ? Math.min(100, Math.round((s.duplicate_bytes_avoided || 0) / s.total_bytes * 100)) : 0),
+      card('name collisions', Fmt.num(s.collisions), 'renamed with pack', 'card-info', '', share(s.collisions)),
     ].join('');
+    box.classList.toggle('has-on', !!this.action);
     $$('#plan-cards .card[data-act]').forEach((c) => c.addEventListener('click', () => {
       this.action = this.action === c.dataset.act ? '' : c.dataset.act;
       $('#op-action').value = this.action;
