@@ -28,11 +28,12 @@ const Starter = {
   },
   async roll(rerollSlot) {
     this.stopAll();
-    let locked = {};
+    let locked = {}, avoid = {};
     let key = $('#bs-key').value || null;
     let bpm = +$('#bs-bpm').value || null;
     if (rerollSlot) {
       locked = this.ids();
+      avoid[rerollSlot] = locked[rerollSlot];
       delete locked[rerollSlot];
       key = this.res.key; bpm = this.res.bpm;
     } else {
@@ -40,7 +41,7 @@ const Starter = {
       for (const s of Object.keys(this.locks)) if (this.locks[s] && cur[s]) locked[s] = cur[s];
     }
     try {
-      this.res = await API.post('/api/starter', { key, bpm, locked });
+      this.res = await API.post('/api/starter', { key, bpm, locked, avoid });
     } catch (e) { toast(e.message, 'err'); return; }
     this.render();
   },
@@ -51,6 +52,7 @@ const Starter = {
       const v = r && r.slots[slot];
       if (!v) return `<article class="bs-slot bs-empty" data-slot="${slot}"><h3 class="side-h">${SLOT_LABEL[slot]}</h3><p class="dim">${esc((r && r.missing[slot]) || 'Nothing picked yet')}</p></article>`;
       const row = v.row, on = !!this.locks[slot];
+      const only = !v.locked && (r.options[slot] || 0) < 2;
       return `<article class="bs-slot${on ? ' locked' : ''}" data-slot="${slot}">
         <h3 class="side-h">${SLOT_LABEL[slot]}</h3>
         <p class="bs-name ellip" title="${esc(row.abs_path)}">${esc(row.name)}</p>
@@ -60,7 +62,7 @@ const Starter = {
         <div class="bs-acts">
           <button type="button" class="btn btn-small bs-play"><svg><use href="#i-${Player.isPlaying(row.id) ? 'stop' : 'play'}"/></svg>Play</button>
           <button type="button" class="btn btn-small bs-lock" aria-pressed="${on}">${on ? 'Locked' : 'Lock'}</button>
-          <button type="button" class="btn btn-small btn-ghost bs-reroll" ${on ? 'disabled' : ''}>Reroll</button>
+          <button type="button" class="btn btn-small btn-ghost bs-reroll" ${on || only ? 'disabled' : ''} ${only ? 'title="Only one loop fits this key and tempo"' : ''}>Reroll</button>
         </div></article>`;
     }).join('');
     $$('#bs-slots .bs-slot').forEach((el) => {

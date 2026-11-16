@@ -282,15 +282,15 @@ function url(hash) {
       const nm = async (slot) => page.textContent(`#bs-slots .bs-slot[data-slot="${slot}"] .bs-name`);
       const drums0 = await nm('drums'), mel0 = await nm('melody');
       await page.click('#bs-slots .bs-slot[data-slot="drums"] .bs-lock');
-      let changed = false, kept = true;
-      for (let i = 0; i < 8 && !changed; i++) {
-        await page.click('#bs-slots .bs-slot[data-slot="melody"] .bs-reroll');
+      const reroll = '#bs-slots .bs-slot[data-slot="melody"] .bs-reroll';
+      if (await page.isDisabled(reroll)) {
+        check('single-option reroll explained', /Only one loop/.test(await page.getAttribute(reroll, 'title') || ''));
+      } else {
+        await page.click(reroll);
         await settle(250);
-        kept = kept && (await nm('drums')) === drums0;
-        changed = (await filled('melody')) && (await nm('melody')) !== mel0;
+        check('locked drums kept on reroll', (await nm('drums')) === drums0);
+        check('reroll changes a slot', (await filled('melody')) && (await nm('melody')) !== mel0);
       }
-      check('locked drums kept on reroll', kept);
-      check('reroll changes a slot', changed);
       await page.click('#bs-save');
       await settle(300);
       check('saved set listed', (await page.locator('#bs-saved .bs-set').count()) === 1);

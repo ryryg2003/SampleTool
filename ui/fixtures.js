@@ -473,7 +473,8 @@
     let seed = +b.seed || (1 + Math.floor(Math.random() * 999999));
     const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
     const locked = b.locked || {};
-    const out = { key: b.key || null, bpm: b.bpm || null, seed: +b.seed || seed, slots: {}, missing: {} };
+    const out = { key: b.key || null, bpm: b.bpm || null, seed: +b.seed || seed, slots: {}, missing: {}, options: {} };
+    const avoid = b.avoid || {};
     const loops = (role) => items.filter((i) => i.loop_type === 'loop' && ROLE[i.category] === role && !i.excluded);
     for (const id of Object.values(locked)) { const it = byId.get(id); if (it) { out.key = out.key || it.key; out.bpm = out.bpm || it.bpm; } }
     if (!out.key || !out.bpm) { const mel = loops('melody').filter((i) => i.key && i.bpm); if (mel.length) { const pk = mel[Math.floor(rnd() * mel.length)]; out.key = out.key || pk.key; out.bpm = out.bpm || pk.bpm; } }
@@ -482,7 +483,10 @@
       let it = locked[slot] ? byId.get(locked[slot]) : null;
       if (!it) {
         const good = loops(slot).map((i) => [pairScore(tgt, i)[0], i]).filter((x) => x[0] >= 0.75).sort((x, y) => y[0] - x[0]).slice(0, 8);
-        it = good.length ? good[Math.floor(rnd() * good.length)][1] : null;
+        out.options[slot] = good.length;
+        const fresh = good.filter((x) => x[1].id !== avoid[slot]);
+        const pool = fresh.length ? fresh : good;
+        it = pool.length ? pool[Math.floor(rnd() * pool.length)][1] : null;
       }
       if (!it) { out.slots[slot] = null; out.missing[slot] = `No ${slot} loops fit ${out.key || 'any key'} at ${out.bpm || 'any'} BPM`; continue; }
       const [sc, why] = pairScore(tgt, it);

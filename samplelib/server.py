@@ -545,7 +545,8 @@ class Handler(BaseHTTPRequestHandler):
             bpm = b.get("bpm")
             return self._send(200, matching.starter(
                 st, b.get("key") or None, float(bpm) if bpm else None,
-                b.get("locked") or {}, int(b["seed"]) if b.get("seed") else None))
+                b.get("locked") or {}, int(b["seed"]) if b.get("seed") else None,
+                b.get("avoid") or {}))
         if path == "/api/starters":
             bpm = b.get("bpm")
             return self._send(200, {"ok": True, "starter": st.save_starter(

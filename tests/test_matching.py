@@ -121,6 +121,16 @@ class StarterTest(MatchingBase):
         r = matching.starter(self.st, key="Am", bpm=128, seed=3)
         self.assertEqual(r["slots"]["bass"]["row"]["name"], "Bass Same.wav")
 
+    def test_reroll_avoids_current_pick(self):
+        extra = [mk("Drum 128 b%d" % i, DL, "loop", 128) for i in range(3)]
+        self.st._set_inventory(self.items + extra, [], persist=False)
+        first = matching.starter(self.st, key="Am", bpm=128, seed=4)
+        cur = first["slots"]["drums"]["row"]["id"]
+        self.assertGreaterEqual(first["options"]["drums"], 2)
+        for seed in range(10):
+            r = matching.starter(self.st, key="Am", bpm=128, seed=seed, avoid={"drums": cur})
+            self.assertNotEqual(r["slots"]["drums"]["row"]["id"], cur)
+
     def test_missing_slot_explained(self):
         self.st._set_inventory([i for i in self.items if "Bass" not in i["name"]], [], persist=False)
         r = matching.starter(self.st, key="Am", bpm=128, seed=2)

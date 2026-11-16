@@ -215,11 +215,12 @@ def _target(key, bpm):
     return t
 
 
-def starter(store, key=None, bpm=None, locked=None, seed=None):
+def starter(store, key=None, bpm=None, locked=None, seed=None, avoid=None):
     """Pick a drum loop, bass and melody that fit together.
 
     Locked slots ({slot: item id}) are kept and set key/tempo when none are
-    given. Same arguments and seed -> same result."""
+    given. avoid ({slot: id}) skips that pick when another fits (reroll).
+    Same arguments and seed -> same result."""
     import random
     if seed is None:
         seed = random.randrange(1, 1_000_000)
@@ -248,7 +249,8 @@ def starter(store, key=None, bpm=None, locked=None, seed=None):
                 if pick.role not in fixed:
                     fixed[pick.role] = pick
         target = _target(key, bpm)
-        slots, missing = {}, {}
+        slots, missing, options = {}, {}, {}
+        avoid = avoid or {}
         for slot in SLOTS:
             if slot in fixed:
                 f = fixed[slot]
@@ -256,7 +258,9 @@ def starter(store, key=None, bpm=None, locked=None, seed=None):
                 scored = sorted(((_fast_score(target, f), f) for f in pools[slot]),
                                 key=lambda t: (-t[0], t[1].it["id"]))
                 good = [f for s, f in scored if s >= 0.75][:8]
-                f = rng.choice(good) if good else None
+                options[slot] = len(good)
+                fresh = [f for f in good if f.it["id"] != avoid.get(slot)]
+                f = rng.choice(fresh or good) if good else None
             if f is None:
                 slots[slot] = None
                 missing[slot] = "No %s loops fit %s at %s BPM" % (
@@ -265,4 +269,5 @@ def starter(store, key=None, bpm=None, locked=None, seed=None):
             s, reasons = score_pair(target, f)
             slots[slot] = {"row": store.row(f.it), "score": round(s, 3), "reasons": reasons,
                            "locked": slot in locked}
-        return {"key": key, "bpm": bpm, "seed": seed, "slots": slots, "missing": missing}
+        return {"key": key, "bpm": bpm, "seed": seed, "slots": slots, "missing": missing,
+                "options": options}
