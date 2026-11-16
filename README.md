@@ -83,3 +83,6 @@ are attached to the workflow as artifacts.
 
 `docs/FREE_SOUNDS_ADDON.md`: research and proposal for searching Freesound
 (CC0-licensed sounds) from inside the app.
+
+`docs/UI_PLAN.md`: the Prism Aurora design reference (image, color tokens,
+components, motion). All UI work follows it.
