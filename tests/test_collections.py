@@ -144,7 +144,6 @@ class CollectionsCase(unittest.TestCase):
         self.assertEqual(env.get("/api/collections")["collections"], [])
         code, _ = env.post("/api/collections/delete", {"id": c["id"]}, expect=None)
         self.assertEqual(code, 400)
-        code, _ = env.raw("GET", "/api/samples", q={"collection": "nope"})[:2] + (None,)[:0] or (0, 0)
         self.assertEqual(env.raw("GET", "/api/samples", q={"collection": "nope"})[0], 404)
 
     def test_smart_collection_save_and_restore(self):
@@ -293,6 +292,11 @@ class NewFilesCase(unittest.TestCase):
             self.assertEqual(o["reason"], "not new since last run; left for a later plan")
         new_ops = [by_item[rows[rel]["id"]] for rel in added]
         self.assertTrue(any(o["action"] == "move" for o in new_ops))
+        # a new kit stem that duplicates an old (not moved) kit stem is moved, not linked
+        kk = by_item[rows[f"{NEW_PACK}/Construction Kits/Dawn 120 C/Stems/Kick.wav"]["id"]]
+        if kk.get("kit_id"):
+            self.assertEqual(kk["action"], "move", kk)
+            self.assertIsNone(kk["link_to"])
         kick = by_item[rows[f"{NEW_PACK}/One Shots/Kick Fresh 01.wav"]["id"]]
         self.assertEqual(kick["action"], "move")
         # the new hat duplicates an old file that stays in place: keep, canonical is real
