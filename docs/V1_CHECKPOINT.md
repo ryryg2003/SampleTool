@@ -89,5 +89,5 @@ Start a new session on branch `claude/pensive-albattani-xcadya` and say:
   every step.
 - To resume after another stop: check `git worktree list` and each `worktree-agent-*`
   branch's commits since 6a162b4, then continue or merge from there. Pending release
-  test: the lead keeps `tests/test_release.py` out of the repo until "Create Desktop
+  test: the lead parks it at `docs/pending_test_release.py` (move to tests/ later) until "Create Desktop
   Shortcut.bat" and CHANGELOG.md exist (it checks for both).
