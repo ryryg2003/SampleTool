@@ -1,9 +1,9 @@
 /* settings.css: Settings view and the compact density (owned by the settings feature). */
 
 .view-settings { overflow-y: auto; }
-.set-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 1180px; align-items: start; }
+.set-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 1180px; align-items: stretch; }
 .set-sec { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.set-sec:first-child, .set-sec[aria-labelledby="set-about-h"], .set-sec[aria-labelledby="set-fs-h"] { grid-column: 1 / -1; }
+.set-sec:first-child, .set-sec[aria-labelledby="set-about-h"] { grid-column: 1 / -1; }
 .set-h { font-size: 14px; color: var(--text); letter-spacing: .02em; }
 .set-sec .field-label { margin-bottom: 0; }
 .set-row { display: flex; gap: 8px; align-items: center; min-width: 0; }

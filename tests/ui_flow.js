@@ -139,6 +139,22 @@ async function waitIdle(timeout = 60000) {
     //
     //
     // >>> settings checks (owned by the settings feature; insert between these lines)
+    await page.click('.rail-btn[data-view="settings"]');
+    await page.waitForSelector('#settings-h', { state: 'visible', timeout: 5000 });
+    await sleep(500);
+    check('settings shows the real data folder', (await page.textContent('#set-about')).includes(path.join(tmp, 'data')));
+    await page.$eval('#set-vol', (el) => { el.value = '37'; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); });
+    await sleep(600);
+    const sv = await api('/api/settings');
+    check('settings saves default volume to the server', sv.settings.volume === 37, JSON.stringify(sv.settings));
+    check('saved volume applies to the player', (await page.inputValue('#tp-vol')) === '37');
+    await page.click('#set-density [data-d="compact"]');
+    await sleep(500);
+    check('settings saves density', (await api('/api/settings')).settings.density === 'compact');
+    await shot('flow-07-settings');
+    await page.reload({ waitUntil: 'load' });
+    await sleep(1200);
+    check('density and volume survive a reload', await page.evaluate(() => document.body.classList.contains('density-compact')) && (await page.inputValue('#tp-vol')) === '37');
     // <<< settings checks
     //
     //
