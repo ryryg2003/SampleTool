@@ -380,6 +380,17 @@ def camelot(key):
 
 
 @functools.lru_cache(maxsize=4096)
+def relative_key(key):
+    """Am -> C, C -> Am; None when unknown."""
+    k = norm_key(key)
+    if not k:
+        return None
+    if k.endswith("m"):
+        return NOTES[(NOTES.index(k[:-1]) + 3) % 12]
+    return NOTES[(NOTES.index(k) - 3) % 12] + "m"
+
+
+@functools.lru_cache(maxsize=4096)
 def key_compat(a, b):
     """-> (score 0..1, reason) for two keys."""
     ca, cb = camelot(a), camelot(b)

@@ -462,7 +462,7 @@ const Library = {
   async loadMatches(id) {
     if (!this.current || this.current.kind !== 'audio') return;
     try {
-      const r = await API.get('/api/samples/' + encodeURIComponent(id) + '/matches', { role: this.matchRole || '', limit: 25 });
+      const r = await API.get('/api/samples/' + encodeURIComponent(id) + '/matches', { role: this.matchRole || '', limit: 25, loose: this.matchLoose ? 1 : '' });
       if (this.current && this.current.id === id) { this.matches = r.items; this.renderInspector(); }
     } catch (e) {
       if (this.current && this.current.id === id) { this.matches = []; this.matchErr = e.message; this.renderInspector(); }
@@ -472,10 +472,11 @@ const Library = {
     if (d.kind !== 'audio') return '';
     const role = this.matchRole || '';
     const roles = [['', 'All'], ['drums', 'Drums'], ['bass', 'Bass'], ['melody', 'Melody'], ['vocal-fx', 'Vocal & FX']];
-    const chips = roles.map(([v, l]) => `<button type="button" class="mchip${role === v ? ' on' : ''}" data-role="${v}" aria-pressed="${role === v}">${l}</button>`).join('');
+    const chips = roles.map(([v, l]) => `<button type="button" class="mchip${role === v ? ' on' : ''}" data-role="${v}" aria-pressed="${role === v}">${l}</button>`).join('')
+      + `<button type="button" class="mchip mloose${this.matchLoose ? ' on' : ''}" aria-pressed="${!!this.matchLoose}" title="Loose also allows neighbor keys and tempos a few percent apart">Loose</button>`;
     let body;
     if (this.matches === null) body = '<p class="dim small">Finding matches…</p>';
-    else if (!this.matches.length) body = `<p class="dim small">${esc(this.matchErr || 'No good matches yet. A sample needs a category, plus a tempo or key, to be matched.')}</p>`;
+    else if (!this.matches.length) body = `<p class="dim small">${esc(this.matchErr || (this.matchLoose ? 'No good matches yet. A sample needs a category, plus a tempo or key, to be matched.' : 'No exact matches: nothing shares this tempo (within 0.5%) and key. Try Loose for near matches.'))}</p>`;
     else body = `<ol class="mlist">${this.matches.map((m, i) => `<li class="mrow">
         <button type="button" class="ib mplay" data-i="${i}" aria-label="Play ${esc(m.row.name)}"><svg><use href="#i-${Player.isPlaying(m.row.id) ? 'stop' : 'play'}"/></svg></button>
         <button type="button" class="mname" data-i="${i}" title="Open ${esc(m.row.name)}"><span class="ellip">${esc(m.row.name)}</span><span class="dim mono small ellip">${esc([Fmt.catShort(m.row.category), m.row.bpm && Fmt.bpm(m.row.bpm) + ' BPM', m.row.key].filter(Boolean).join(' · '))}</span></button>
@@ -484,7 +485,8 @@ const Library = {
     return `<section class="matches" aria-label="Goes well with"><h3 class="side-h">Goes well with</h3><div class="mchips" role="group" aria-label="Filter matches by role">${chips}</div>${body}</section>`;
   },
   bindMatches() {
-    $$('#inspector .mchip').forEach((b) => { b.onclick = () => { this.matchRole = b.dataset.role; this.matches = null; this.renderInspector(); this.loadMatches(this.current.id); }; });
+    $$('#inspector .mchip:not(.mloose)').forEach((b) => { b.onclick = () => { this.matchRole = b.dataset.role; this.matches = null; this.renderInspector(); this.loadMatches(this.current.id); }; });
+    $$('#inspector .mloose').forEach((b) => { b.onclick = () => { this.matchLoose = !this.matchLoose; this.matches = null; this.renderInspector(); this.loadMatches(this.current.id); }; });
     $$('#inspector .mplay').forEach((b) => { b.onclick = () => { Player.toggle(this.matches[+b.dataset.i].row); this.renderInspector(); }; });
     $$('#inspector .mname').forEach((b) => { b.onclick = () => this.inspect(this.matches[+b.dataset.i].row); });
   },

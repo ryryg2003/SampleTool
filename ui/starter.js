@@ -16,6 +16,7 @@ const Starter = {
     $('#bs-new').onclick = () => { this.locks = {}; this.roll(); };
     $('#bs-playall').onclick = () => this.togglePlayAll();
     $('#bs-save').onclick = () => this.save();
+    $('#bs-loose').onchange = () => this.roll();
   },
   show() {
     if (!this.res) this.roll();
@@ -41,7 +42,7 @@ const Starter = {
       for (const s of Object.keys(this.locks)) if (this.locks[s] && cur[s]) locked[s] = cur[s];
     }
     try {
-      this.res = await API.post('/api/starter', { key, bpm, locked, avoid });
+      this.res = await API.post('/api/starter', { key, bpm, locked, avoid, loose: $('#bs-loose').checked });
     } catch (e) { toast(e.message, 'err'); return; }
     this.render();
   },
