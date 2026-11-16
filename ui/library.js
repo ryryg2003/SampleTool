@@ -50,15 +50,15 @@ const Library = {
       sort: Store.get('lib.sort', 'name'), dir: Store.get('lib.dir', 'asc'),
       columns: [
         { key: 'play', label: '', sr: 'Playing', width: '28px', cls: 'c-play', render: (r) => `<i class="pl${Player.isPlaying(r.id) ? ' on' : Player.row && Player.row.id === r.id ? ' loaded' : ''}" aria-hidden="true"></i>` },
-        { key: 'name', label: 'Name', sort: 'name', width: 'minmax(150px, 2.2fr)', cls: 'c-name', title: (r) => r.abs_path, render: (r) => `<span class="nm ellip">${esc(r.name)}</span>${extBadge(r)}${r.kit_name ? `<span class="kitmark" title="Part of kit ${esc(r.kit_name)}">kit</span>` : ''}${r.dup_count > 1 ? `<span class="dupmark mono" title="${r.dup_count} identical copies">×${r.dup_count}</span>` : ''}` },
-        { key: 'pack', label: 'Pack', sort: 'pack', width: 'minmax(90px, 1.1fr)', cls: 'c-pack', title: (r) => r.pack || '', render: (r) => `<span class="ellip">${esc(r.pack ? shortPack(r.pack, r.manufacturer) : (r.origin === 'library' ? 'In library' : '—'))}</span>` },
+        { key: 'name', label: 'Name', sort: 'name', width: 'minmax(120px, 2.2fr)', cls: 'c-name', title: (r) => r.abs_path, render: (r) => `<span class="nm ellip">${esc(r.name)}</span>${extBadge(r)}${r.kit_name ? `<span class="kitmark" title="Part of kit ${esc(r.kit_name)}">kit</span>` : ''}${r.dup_count > 1 ? `<span class="dupmark mono" title="${r.dup_count} identical copies">×${r.dup_count}</span>` : ''}` },
+        { key: 'pack', label: 'Pack', sort: 'pack', width: 'minmax(80px, 1.1fr)', cls: 'c-pack', title: (r) => r.pack || '', render: (r) => `<span class="ellip">${esc(r.pack ? shortPack(r.pack, r.manufacturer) : (r.origin === 'library' ? 'In library' : '—'))}</span>` },
         { key: 'inst', label: 'Instrument', width: 'minmax(64px, .55fr)', cls: 'c-inst', title: (r) => r.category || '', render: (r) => `<span class="ellip">${esc(r.instrument || Fmt.catShort(r.category) || '—')}</span>` },
         { key: 'bpm', label: 'BPM', sort: 'bpm', width: '46px', cls: 'num', render: (r) => esc(Fmt.bpm(r.bpm)) },
         { key: 'key', label: 'Key', sort: 'key', width: '42px', cls: 'c-key', render: (r) => esc(r.key || '') },
         { key: 'dur', label: 'Length', sort: 'duration', width: '54px', cls: 'num', render: (r) => r.duration_s ? Fmt.dur(r.duration_s) : '' },
         { key: 'size', label: 'Size', sort: 'size', width: '60px', cls: 'num', render: (r) => Fmt.bytes(r.size) },
         { key: 'st', label: 'Status', sort: 'status', width: '76px', cls: 'c-st', render: (r) => statusBadge(r.review_status) },
-        { key: 'star', label: '', sr: 'Starred', width: '24px', cls: 'c-star', render: (r) => starBtn(r) },
+        { key: 'star', label: '', sr: 'Starred', width: '20px', cls: 'c-star', render: (r) => starBtn(r) },
         { key: 'act', label: '', sr: 'Actions', width: '72px', cls: 'c-act', render: () => `<button type="button" class="ib" data-act="copy" aria-label="Copy path" title="Copy path" tabindex="-1"><svg><use href="#i-copy"/></svg></button><button type="button" class="ib" data-act="reveal" aria-label="Show in Explorer" title="Show in Explorer" tabindex="-1"><svg><use href="#i-folder"/></svg></button><button type="button" class="ib" data-act="edit" aria-label="Edit" title="Edit (E)" tabindex="-1"><svg><use href="#i-edit"/></svg></button>` },
       ],
       fetch: (offset, limit) => API.get('/api/samples', Object.assign(this.params(), { sort: this.table.sort, dir: this.table.dir, offset, limit })),
@@ -414,7 +414,7 @@ const Library = {
           <button class="btn btn-small" type="button" id="ins-play"><svg><use href="#i-${Player.isPlaying(d.id) ? 'stop' : 'play'}"/></svg>${Player.isPlaying(d.id) ? 'Stop' : 'Play'}</button>
           <button class="btn btn-small" type="button" id="ins-edit"><svg><use href="#i-edit"/></svg>Edit</button>
           ${starBtn(d, ' ins-star').replace('tabindex="-1"', 'id="ins-star"')}
-          <button class="btn btn-small" type="button" id="ins-coll" ${d.sha256 ? '' : `disabled title="${esc(NO_HASH_TIP)}"`}>Collect…</button>
+          <button class="ib ins-collb" type="button" id="ins-coll" aria-label="Add to collection" ${d.sha256 ? 'title="Add to collection…"' : `disabled title="${esc(NO_HASH_TIP)}"`}><svg viewBox="0 0 24 24"><path d="M4 7h11M4 12h11M4 17h7M18 14v6M15 17h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
           <button class="ib" type="button" id="ins-copy" aria-label="Copy original path" title="Copy original path"><svg><use href="#i-copy"/></svg></button>
           <button class="ib" type="button" id="ins-reveal" aria-label="Show in Explorer" title="Show in Explorer"><svg><use href="#i-folder"/></svg></button>
         </div>

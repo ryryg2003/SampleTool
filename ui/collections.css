@@ -52,3 +52,8 @@
 .ins-actions .btn svg { margin-right: 0; }
 #ins-mstar svg { color: var(--amber); }
 .card.c-new.has-new::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 2px 2px 0; background: var(--amber); }
+.ins-actions .ins-collb:disabled { opacity: .35; cursor: not-allowed; }
+/* keep the inspector action row on one line with the added star + collect buttons */
+.ins-top .ins-actions { gap: 4px; }
+.ins-top .ins-actions .btn-small { padding: 0 7px; }
+.ins-actions .ib.star { width: 24px; }
