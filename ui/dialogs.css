@@ -1,0 +1,132 @@
+/* Dialogs, toasts, and loading / empty / error states. Loaded after views.css. */
+
+/* ---------- Virtual-table states (loading / empty / error) ---------- */
+.vt-state:empty { display: none; }
+.vt-state { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
+.vt-state > div { max-width: 44ch; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.vt-state p { margin: 0; line-height: 1.5; }
+.vt-state strong { color: var(--text); font: 700 16px var(--f-label); letter-spacing: -.005em; }
+.vt-state .btn { margin-top: 6px; }
+/* A small mark above the message: equalizer bars for empty, an alert for errors. */
+.vt-state.is-empty > div::before,
+.vt-state.is-error > div::before {
+  content: ""; width: 52px; height: 52px; margin-bottom: 6px; border-radius: 16px; flex: none;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(to top, var(--accent), var(--accent-2)) 13px 100% / 4px 14px no-repeat,
+    linear-gradient(to top, var(--accent), var(--accent-2)) 20px 100% / 4px 26px no-repeat,
+    linear-gradient(to top, var(--accent), var(--accent-2)) 27px 100% / 4px 18px no-repeat,
+    linear-gradient(to top, var(--accent), var(--accent-2)) 34px 100% / 4px 9px no-repeat,
+    var(--raised);
+  background-origin: content-box; padding: 13px 0; box-sizing: border-box;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.vt-state.is-error > div::before {
+  content: "!"; display: grid; place-items: center; padding: 0;
+  font: 800 24px var(--f-label); color: var(--err);
+  background: color-mix(in srgb, var(--err) 14%, transparent);
+  border-color: color-mix(in srgb, var(--err) 45%, transparent);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--err) 22%, transparent);
+}
+.vt-state.is-error strong { color: var(--err-ink); }
+.vt-state.is-error p { color: var(--muted); word-break: break-word; }
+
+/* Loading: three gradient level bars. */
+.loading { display: flex !important; flex-direction: row !important; gap: 4px; align-items: center !important; height: 22px; }
+.loading i { width: 4px; height: 8px; background: var(--grad); border-radius: 2px; animation: vu 0.9s ease-in-out infinite; }
+.loading i:nth-child(2) { animation-delay: .15s; } .loading i:nth-child(3) { animation-delay: .3s; }
+.loading span { margin-left: 8px; color: var(--muted); font-size: 12.5px; }
+@keyframes vu { 0%, 100% { height: 6px; } 50% { height: 20px; } }
+
+/* Inline empty notes inside panels (scan summary, kits, kit detail). */
+.empty { padding: 24px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; line-height: 1.5; }
+.empty p { margin: 0; max-width: 60ch; }
+.empty strong { color: var(--text); font: 700 15px var(--f-label); }
+
+/* ---------- Dialogs ---------- */
+.dlg {
+  color: var(--text); padding: 0;
+  background:
+    linear-gradient(90deg, var(--accent), var(--accent-2)) top / 100% 2px no-repeat,
+    radial-gradient(120% 70% at 0% 0%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 62%),
+    radial-gradient(90% 60% at 100% 100%, color-mix(in srgb, var(--accent-2) 9%, transparent), transparent 60%),
+    color-mix(in srgb, var(--solid) 84%, transparent);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(255, 255, 255, .14); border-radius: var(--r-card);
+  width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 40px);
+  box-shadow: 0 30px 90px rgba(4, 1, 14, .65), 0 0 0 1px rgba(255, 255, 255, .03) inset,
+    0 0 60px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.dlg[open] { animation: dlg-in .18s cubic-bezier(.2, .8, .3, 1); }
+@keyframes dlg-in { from { transform: translateY(10px) scale(.985); } }
+.dlg::backdrop { background: rgba(9, 5, 26, .58); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.dlg-body { padding: 24px 26px 22px; display: flex; flex-direction: column; gap: 14px; }
+.dlg h2 { font-size: 20px; font-weight: 800; letter-spacing: -.01em; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; line-height: 1.25; }
+.dlg h2 .mono {
+  font-size: 12.5px; font-weight: 600; color: var(--text); padding: 2px 8px; border-radius: var(--r-tag);
+  background: color-mix(in srgb, var(--accent) 18%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.dlg h2 .mono:empty { display: none; }
+.dlg p { color: var(--muted); line-height: 1.5; margin: 0; }
+.dlg p em { color: var(--text); font-style: normal; font-weight: 600; }
+.dlg .check { color: var(--text); }
+.dlg-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; padding-top: 16px; border-top: 1px solid var(--line); }
+.dlg-err {
+  background: color-mix(in srgb, var(--err) 14%, transparent); border: 1px solid color-mix(in srgb, var(--err) 48%, transparent);
+  color: var(--err-ink); padding: 10px 14px; border-radius: var(--r-in); font-size: 12.5px; line-height: 1.45;
+}
+
+/* Count tables (approve). */
+.dlg-table {
+  width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px;
+  background: var(--field); border: 1px solid var(--line); border-radius: var(--r-in); overflow: hidden;
+}
+.dlg-table th { text-align: left; font: 600 12px var(--f-label); color: var(--muted); padding: 9px 14px; border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, .03); }
+.dlg-table td { padding: 7px 14px; border-bottom: 1px solid var(--line-soft); }
+.dlg-table tbody tr:last-child td { border-bottom: 0; }
+.dlg-table tfoot td { border-bottom: 0; border-top: 1px solid var(--line); font-weight: 700; background: rgba(255, 255, 255, .03); }
+.dlg-table .num { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+/* Bulk edit grid. */
+.bulk-grid {
+  display: grid; grid-template-columns: 136px minmax(0, 1fr); gap: 8px 14px; align-items: center;
+  padding: 14px; background: var(--field); border: 1px solid var(--line); border-radius: var(--r-in);
+}
+.bulk-set { display: flex; align-items: center; gap: 9px; font: 600 13px var(--f-label); cursor: pointer; color: var(--muted); }
+.bulk-set:has(input:checked) { color: var(--text); }
+.bulk-ctl .input, .bulk-ctl select { width: 100%; }
+
+/* Keyboard help. */
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 0; margin: 0; background: var(--field); border: 1px solid var(--line); border-radius: var(--r-in); overflow: hidden; }
+.keys dt, .keys dd { padding: 8px 14px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; }
+.keys dt:nth-last-of-type(1), .keys dd:nth-last-of-type(1) { border-bottom: 0; }
+.keys dt { justify-content: flex-end; gap: 4px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.keys dd { margin: 0; color: var(--text); }
+.keys kbd { color: var(--text); min-width: 22px; text-align: center; padding: 2px 7px; border-radius: 7px; border-bottom-width: 2px; }
+
+/* ---------- Toasts ---------- */
+.toasts { position: fixed; right: 24px; bottom: 104px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; z-index: 50; pointer-events: none; max-width: 420px; }
+.toast {
+  --tc: var(--accent-2);
+  position: relative; display: flex; align-items: flex-start; gap: 10px;
+  background: color-mix(in srgb, var(--solid) 88%, transparent); color: var(--text);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--line); padding: 10px 16px 10px 14px; border-radius: var(--r-in);
+  box-shadow: 0 14px 34px rgba(4, 1, 14, .5); font-size: 12.5px; line-height: 1.45;
+  transition: opacity .3s, transform .3s; animation: toast-in .22s cubic-bezier(.2, .8, .3, 1);
+}
+.toast::before { content: ""; flex: none; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--tc); box-shadow: 0 0 10px var(--tc); }
+.toast-err { --tc: var(--err); border-color: color-mix(in srgb, var(--err) 40%, transparent); }
+.toast-warn { --tc: var(--hold); border-color: color-mix(in srgb, var(--hold) 36%, transparent); }
+.toast.out { opacity: 0; transform: translateY(6px); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+
+/* Reduce effects / reduced transparency: solid dialogs and toasts. */
+:root.reduce-fx .dlg, :root.reduce-fx .toast { -webkit-backdrop-filter: none; backdrop-filter: none; background-color: var(--solid); }
+:root.reduce-fx .toast { background: var(--solid); }
+:root.reduce-fx .dlg::backdrop { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(9, 5, 26, .78); }
+@media (prefers-reduced-transparency: reduce) {
+  .dlg, .toast { -webkit-backdrop-filter: none; backdrop-filter: none; background-color: var(--solid); }
+  .toast { background: var(--solid); }
+  .dlg::backdrop { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(9, 5, 26, .78); }
+}

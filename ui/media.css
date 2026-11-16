@@ -1,0 +1,21 @@
+/* media.css: owned by the media feature. Waveform deck, retrigger toggle, drag rows,
+   inspector extras. Uses the console tokens from app.css. */
+
+/* The deck waveform itself is styled in player.css (Prism Aurora). */
+
+/* Message with an action (e.g. Show in Explorer for REX) */
+.tp-msg.has-act { max-height: 48px; }
+.tp-msg-act {
+  background: none; border: 0; padding: 0; margin-left: 2px; cursor: pointer;
+  color: var(--amber); font: inherit; text-decoration: underline; text-underline-offset: 2px;
+}
+.tp-msg-act:hover { color: var(--text); }
+
+/* Draggable library rows */
+.vt-row[draggable="true"] { -webkit-user-drag: element; }
+.vt-row.is-drag { opacity: .55; }
+
+/* Inspector: REX note with a Reveal button */
+.media-note { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.media-note .btn { color: var(--text); }
+

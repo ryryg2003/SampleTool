@@ -5,10 +5,9 @@ import os
 import shutil
 import tempfile
 import threading
-import time
 import unittest
 
-from samplelib import executor, models
+from samplelib import executor
 from tests.test_e2e import Env
 
 

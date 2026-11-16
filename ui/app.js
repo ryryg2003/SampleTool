@@ -11,7 +11,7 @@ function segKeys(group) {
     const n = bs[(i + (ev.key === 'ArrowRight' ? 1 : bs.length - 1)) % bs.length]; n.focus(); n.click();
   });
 }
-const PHASE_LABEL = { walking: 'Finding files', hashing: 'Fingerprinting audio', metadata: 'Reading tags', classifying: 'Classifying sounds', kits: 'Detecting kits', complete: 'Complete', cancelled: 'Cancelled', idle: 'Idle' };
+const PHASE_LABEL = { walking: 'Finding files', hashing: 'Fingerprinting audio', metadata: 'Reading tags', classifying: 'Classifying sounds', analyzing: 'Measuring tempo & key', kits: 'Detecting kits', complete: 'Complete', cancelled: 'Cancelled', idle: 'Idle' };
 const JOB_LABEL = { scan: 'Scanning', plan: 'Building plan', execute: 'Running plan', export: 'Writing reports', idle: 'Idle' };
 
 const Shell = {
@@ -25,12 +25,13 @@ const Shell = {
   go(v) { if (location.hash !== '#' + v) location.hash = v; else this.route(); },
   route() {
     let v = location.hash.replace('#', '');
-    if (!['scan', 'review', 'library', 'log'].includes(v)) v = App.state && !App.state.has_inventory ? 'scan' : 'library';
+    if (!App.views[v]) v = App.state && !App.state.has_inventory ? 'scan' : 'library';
     App.view = v;
     $$('.view').forEach((s) => { s.hidden = s.id !== 'view-' + v; });
     $$('.rail-btn').forEach((b) => { const on = b.dataset.view === v; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-    document.title = { scan: 'Scan', review: 'Review', library: 'Library', log: 'Move Log' }[v] + ' · Sample Library Organizer';
-    ({ scan: Scan, review: Review, library: Library, log: MoveLog })[v].show();
+    document.title = App.views[v].title + ' · Sample Library Organizer';
+    if (v !== 'starter' && typeof Starter !== 'undefined') Starter.stopAll();
+    App.views[v].obj.show();
   },
   pollSoon() { clearTimeout(this.pt); this.pt = setTimeout(() => this.poll(), 120); },
   async poll() {
@@ -139,20 +140,26 @@ const Scan = {
     const agg = packs.reduce((a, p) => ({ files: a.files + p.files, audio: a.audio + p.audio, kits: a.kits + p.kits, bytes: a.bytes + p.bytes }), { files: 0, audio: 0, kits: 0, bytes: 0 });
     const v = (k, fallback) => (ss[k] !== undefined ? ss[k] : ps[k] !== undefined ? ps[k] : fallback);
     const planOnly = (k) => (ss[k] !== undefined || ps[k] !== undefined ? Fmt.num(v(k)) : '—');
-    const card = (val, label, sub) => `<div class="card"><span class="card-v mono">${val}</span><span class="card-k">${label}</span>${sub ? `<span class="card-s mono">${sub}</span>` : ''}</div>`;
+    // Stat tiles. The bar shows a share of all files where that means something; packs and kits get none.
+    const files = v('total_files', agg.files) || 0;
+    const share = (k, fallback) => { const n = v(k, fallback); return files && typeof n === 'number' ? Math.min(100, Math.round(n / files * 100)) : null; };
+    const card = (val, label, sub, tone, pct) => `<div class="card ${tone}"><span class="card-k">${label}</span><span class="card-v mono">${val}</span>${sub ? `<span class="card-s mono">${sub}</span>` : ''}${pct === null || pct === undefined ? '' : `<span class="card-bar" aria-hidden="true"><i style="--p:${pct}%"></i></span>`}</div>`;
     box.innerHTML = `<h2 class="sub-h">Last scan</h2><div class="cards cards-scan">
-      ${card(Fmt.num(v('total_files', agg.files)), 'files', Fmt.bytes(v('total_bytes', agg.bytes)))}
-      ${card(Fmt.num(v('audio_files', agg.audio)), 'recognized audio')}
-      ${card(Fmt.num(v('packs', packs.length)), 'packs')}
-      ${card(Fmt.num(v('kits', agg.kits)), 'complete kits')}
-      ${card(planOnly('duplicate_groups'), 'duplicate groups', ps.duplicate_bytes_avoided ? Fmt.bytes(ps.duplicate_bytes_avoided) + ' redundant' : '')}
-      ${card(planOnly('unknown_formats'), 'unknown formats')}
-      ${card(planOnly('collisions'), 'name collisions')}
-      ${card(planOnly('held'), 'held for review')}
+      ${card(Fmt.num(files), 'files', Fmt.bytes(v('total_bytes', agg.bytes)), 't-files', files ? 100 : 0)}
+      ${card(Fmt.num(v('audio_files', agg.audio)), 'recognized audio', '', 't-audio', share('audio_files', agg.audio))}
+      ${card(Fmt.num(v('packs', packs.length)), 'packs', '', 't-packs')}
+      ${card(Fmt.num(v('kits', agg.kits)), 'complete kits', '', 't-kits')}
+      ${card(planOnly('duplicate_groups'), 'duplicate groups', ps.duplicate_bytes_avoided ? Fmt.bytes(ps.duplicate_bytes_avoided) + ' redundant' : '', 't-dupes')}
+      ${card(planOnly('unknown_formats'), 'unknown formats', '', 't-unknown', share('unknown_formats', undefined))}
+      ${card(planOnly('collisions'), 'name collisions', '', 't-collide', share('collisions', undefined))}
+      ${card(planOnly('held'), 'held for review', '', 't-held', share('held', undefined))}
+      ${ss.new_files !== undefined ? `<div class="card c-new${ss.new_files ? ' has-new' : ' card-info'}" title="Files that arrived after the last approved run (on the first scan nothing counts as new)"><span class="card-k">new since last run</span><span class="card-v mono">${Fmt.num(ss.new_files)}</span>${ss.new_files ? `<span class="card-s mono">${Fmt.num(ss.new_packs)} pack${ss.new_packs === 1 ? '' : 's'}${ss.new_bytes ? ' · ' + Fmt.bytes(ss.new_bytes) : ''}</span>` : ''}<span class="card-bar" aria-hidden="true"><i style="--p:${files ? Math.min(100, Math.round((ss.new_files || 0) / files * 100)) : 0}%"></i></span></div>` : ''}
     </div>
     ${!ss.duplicate_groups && !s.plan ? '<p class="hint">Duplicate, collision and hold counts appear once a plan is built.</p>' : ''}
-    <div class="next-step"><button class="btn btn-primary" type="button" id="scan-to-lib">Browse library</button><button class="btn" type="button" id="scan-to-review">Review plan</button></div>`;
+    <div class="next-step"><button class="btn btn-primary" type="button" id="scan-to-lib">Browse library</button><button class="btn" type="button" id="scan-to-review">Review plan</button>${ss.new_files ? `<button class="btn" type="button" id="scan-plan-new" title="Only new files get moved; everything else is kept where it is for a later plan. You still review and approve.">Plan only new files (${Fmt.num(ss.new_files)})</button><button class="btn btn-ghost" type="button" id="scan-see-new">Show new files</button>` : ''}</div>`;
     $('#scan-to-lib').onclick = () => Shell.go('library');
+    if ($('#scan-plan-new')) $('#scan-plan-new').onclick = () => Collections.planOnlyNew();
+    if ($('#scan-see-new')) $('#scan-see-new').onclick = () => { Library.clearAll(); Library.setNewOnly(true); Shell.go('library'); };
     $('#scan-to-review').onclick = () => Shell.go('review');
   },
   show() { this.renderSummary(); if (Shell.progress) this.renderProgress(Shell.progress); },
@@ -164,7 +171,7 @@ const MoveLog = {
   status: '', q: '',
   init() {
     this.table = new VTable($('#log-table'), {
-      label: 'Move log', rowHeight: 30, pageSize: 200,
+      label: 'Move log', rowHeight: 50, pageSize: 200,
       columns: [
         { key: 't', label: 'Time', width: '138px', cls: 'mono dim c-time', render: (r) => esc(Fmt.time(r.timestamp)) },
         { key: 's', label: 'Result', width: '96px', render: (r) => `<span class="rs rs-${esc(r.status)}">${esc(LOG_STATUS[r.status] || r.status)}</span>` },
@@ -174,6 +181,7 @@ const MoveLog = {
         { key: 'e', label: 'Error / note', width: 'minmax(120px, 1.2fr)', cls: 'c-err', title: (r) => r.error || '', render: (r) => `<span class="ellip">${esc(r.error || '')}</span>` },
         { key: 'x', label: '', sr: 'Actions', width: '52px', cls: 'c-act', render: () => '<button type="button" class="ib" data-act="copy" aria-label="Copy path" title="Copy path" tabindex="-1"><svg><use href="#i-copy"/></svg></button><button type="button" class="ib" data-act="reveal" aria-label="Show in Explorer" title="Show in Explorer" tabindex="-1"><svg><use href="#i-folder"/></svg></button>' },
       ],
+      rowClass: (r) => `row-rs-${esc(r.status || 'skipped')}`,
       fetch: (offset, limit) => API.get('/api/log', { status: this.status, q: this.q, offset, limit }),
       onTotal: (t) => { $('#log-count').textContent = Fmt.num(t) + ' entries'; },
       onAction: (a, r) => {
@@ -247,7 +255,9 @@ document.addEventListener('keydown', (ev) => {
     }
     return;
   }
-  if (ev.altKey && ['1', '2', '3', '4'].includes(ev.key)) { ev.preventDefault(); Shell.go(['scan', 'review', 'library', 'log'][+ev.key - 1]); return; }
+  const order = $$('.rail-btn').map((b) => b.dataset.view);
+  if (ev.altKey && /^[1-9]$/.test(ev.key) && order[+ev.key - 1]) { ev.preventDefault(); Shell.go(order[+ev.key - 1]); return; }
+  for (const h of App.keyHandlers) { if (h(ev)) return; }
   if (ev.key === '/') {
     ev.preventDefault();
     const s = { library: '#lib-q', review: '#op-q', log: '#log-q', scan: '#scan-root' }[App.view];
@@ -274,8 +284,35 @@ document.addEventListener('keydown', (ev) => {
   }
 });
 
+/* ================= Theme: accent preset and reduce effects ================= */
+/* Both are per-browser preferences kept in localStorage (slo.accent, slo.reduceFx)
+   through Store, which already swallows blocked-storage errors. */
+const Theme = {
+  ACCENTS: ['magenta', 'teal', 'violet', 'amber'],
+  init() {
+    this.setAccent(Store.get('accent', 'magenta'), false);
+    this.setReduceFx(Store.get('reduceFx', false), false);
+    $$('#accent-pick [role=radio]').forEach((b) => b.addEventListener('click', () => this.setAccent(b.dataset.accent, true)));
+    segKeys($('#accent-pick'));
+    $('#btn-effects').addEventListener('click', () => this.setReduceFx(!document.documentElement.classList.contains('reduce-fx'), true));
+  },
+  setAccent(name, save) {
+    if (!this.ACCENTS.includes(name)) name = 'magenta';
+    document.documentElement.dataset.accent = name;
+    $$('#accent-pick [role=radio]').forEach((b) => b.setAttribute('aria-checked', b.dataset.accent === name ? 'true' : 'false'));
+    if (save) Store.set('accent', name);
+  },
+  setReduceFx(on, save) {
+    on = !!on;
+    document.documentElement.classList.toggle('reduce-fx', on);
+    $('#btn-effects').setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (save) Store.set('reduceFx', on);
+  },
+};
+
 /* ================= Boot ================= */
 (async function boot() {
+  Theme.init();
   await API.init();
   if (API.fixture) {
     $('#fixture-flag').hidden = false;
@@ -284,10 +321,18 @@ document.addEventListener('keydown', (ev) => {
   }
   Player.init();
   Shell.init();
+  App.registerView('scan', Scan, 'Scan');
+  App.registerView('review', Review, 'Review');
+  App.registerView('library', Library, 'Library');
+  App.registerView('starter', Starter, 'Beat Starter');
+  App.registerView('log', MoveLog, 'Move Log');
+  for (const f of App.features) { try { f.init(); } catch (e) { console.error(e); } }
   Scan.init();
   Library.init();
   Review.init();
+  Starter.init();
   MoveLog.init();
+  for (const f of App.features) { if (f.afterInit) { try { f.afterInit(); } catch (e) { console.error(e); } } }
   App.on('state', (s) => Shell.renderPlanStatus(s));
   await App.refreshState();
   App.refreshFacets();

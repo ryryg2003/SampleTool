@@ -8,7 +8,6 @@ looks like one single kit.
 from __future__ import annotations
 
 import gzip
-import os
 import posixpath
 import re
 import zlib

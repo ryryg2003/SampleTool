@@ -58,7 +58,7 @@ function url(hash) {
     const total0 = await countOf('#lib-count');
     check('library loads rows', total0 > 0, `count=${total0}`);
     check('no horizontal page overflow (library)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-    check('nav always visible', (await page.locator('.rail-btn').count()) === 4);
+    check('nav always visible', (await page.locator('.rail-btn').count()) === 7);
     await shot('01-library');
 
     // search (debounced)
@@ -115,6 +115,15 @@ function url(hash) {
     const insName = await page.textContent('#inspector .ins-name').catch(() => '');
     check('inspector follows selection', curName && insName === curName, `${curName} vs ${insName}`);
     check('provenance badges shown', (await page.locator('#inspector .prov').count()) >= 4);
+    // Goes well with: list or an explanation renders; role chips filter it
+    await page.waitForSelector('#inspector .matches .mlist, #inspector .matches p:not(:has-text("Finding"))', { timeout: 5000 });
+    check('goes-well-with section renders', (await page.locator('#inspector .matches').count()) === 1);
+    await page.click('#inspector .mchip[data-role="drums"]');
+    await page.waitForSelector('#inspector .mchip[data-role="drums"].on');
+    await settle(300);
+    check('match role chip applies', (await page.locator('#inspector .mchip.on').getAttribute('data-role')) === 'drums');
+    await page.click('#inspector .mchip[data-role=""]');
+    await settle(300);
     await page.keyboard.press('Space');
     await settle(300);
     const tpMsg = (await page.textContent('#tp-msg')).trim();
@@ -263,6 +272,34 @@ function url(hash) {
       check('no-plan empty state', /No plan yet/.test(await page.textContent('#op-table')));
     }
 
+    // ---------- Beat Starter ----------
+    await page.goto(url('starter'));
+    await page.waitForSelector('#bs-slots .bs-slot', { timeout: 10000 });
+    check('beat starter shows 3 slots', (await page.locator('#bs-slots .bs-slot').count()) === 3);
+    check('no horizontal page overflow (starter)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    const filled = async (slot) => (await page.locator(`#bs-slots .bs-slot[data-slot="${slot}"]:not(.bs-empty)`).count()) === 1;
+    if (fixture && await filled('drums') && await filled('melody')) {
+      const nm = async (slot) => page.textContent(`#bs-slots .bs-slot[data-slot="${slot}"] .bs-name`);
+      const drums0 = await nm('drums'), mel0 = await nm('melody');
+      await page.click('#bs-slots .bs-slot[data-slot="drums"] .bs-lock');
+      const reroll = '#bs-slots .bs-slot[data-slot="melody"] .bs-reroll';
+      if (await page.isDisabled(reroll)) {
+        check('single-option reroll explained', /Only one loop/.test(await page.getAttribute(reroll, 'title') || ''));
+      } else {
+        await page.click(reroll);
+        await settle(250);
+        check('locked drums kept on reroll', (await nm('drums')) === drums0);
+        check('reroll changes a slot', (await filled('melody')) && (await nm('melody')) !== mel0);
+      }
+      await page.click('#bs-save');
+      await settle(300);
+      check('saved set listed', (await page.locator('#bs-saved .bs-set').count()) === 1);
+      await page.click('#bs-saved [data-del="0"]');
+      await settle(300);
+      check('saved set deleted', (await page.locator('#bs-saved .bs-set').count()) === 0);
+    }
+    await shot('starter');
+
     // ---------- Move Log ----------
     await page.click('.rail-btn[data-view="log"]');
     await settle(800);
@@ -299,6 +336,269 @@ function url(hash) {
     }
     await shot('10-scan');
 
+    // >>> media checks (owned by the media feature; insert between these lines)
+    {
+      await page.goto(url('library'));
+      await page.waitForSelector(rows, { timeout: 15000 });
+      await settle();
+      const firstRow = page.locator(rows).first();
+      await firstRow.click();
+      await settle(500);
+      const wave = await page.evaluate(() => ({ cls: document.getElementById('tp-wave').className, ph: document.getElementById('tp-wave-ph').textContent, vis: getComputedStyle(document.getElementById('tp-wave-ph')).display !== 'none', w: document.getElementById('tp-wave-c').width }));
+      check('waveform area renders a placeholder', wave.vis && wave.ph.length > 0 && wave.w > 0, JSON.stringify(wave));
+      check('scrub stays an accessible range control', await page.evaluate(() => { const s = document.getElementById('tp-scrub'); return s.type === 'range' && s.getAttribute('aria-label') === 'Playback position'; }));
+      await page.locator('#lib-table .vt-body').focus();
+      const os0 = await page.getAttribute('#tp-oneshot', 'aria-pressed');
+      await page.keyboard.press('o');
+      check('O toggles retrigger', (await page.getAttribute('#tp-oneshot', 'aria-pressed')) !== os0);
+      check('retrigger persisted', await page.evaluate(() => localStorage.getItem('slo.oneshot') === String(document.getElementById('tp-oneshot').getAttribute('aria-pressed') === 'true')));
+      if ((await page.getAttribute('#tp-oneshot', 'aria-pressed')) !== 'true') await page.click('#tp-oneshot');
+      check('retrigger turns on arrow auditions', await page.evaluate(() => Player.autoOn()));
+      const c0 = await page.evaluate(() => Library.table.cursor);
+      await page.keyboard.press('ArrowDown');
+      await settle(200);
+      check('arrows still move with retrigger on', (await page.evaluate(() => Library.table.cursor)) === c0 + 1);
+      await page.click('#tp-oneshot');
+      check('retrigger button toggles off', (await page.getAttribute('#tp-oneshot', 'aria-pressed')) === 'false');
+      const drag = await page.evaluate(() => {
+        const el = document.querySelector('#lib-table .vt-row:not(.is-ph)');
+        const dt = new DataTransfer();
+        el.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
+        const out = { draggable: el.getAttribute('draggable'), dl: dt.getData('DownloadURL'), uri: dt.getData('text/uri-list'), txt: dt.getData('text/plain') };
+        el.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+        return out;
+      });
+      check('rows are draggable', drag.draggable === 'true');
+      check('dragstart sets DownloadURL to the original file', /^[\w/-]+:[^:]+:http:\/\/127\.0\.0\.1:\d+\/api\/audio\/[\w-]+\?download=1$/.test(drag.dl), drag.dl);
+      check('dragstart sets uri-list and path', drag.uri.startsWith('file:///') && drag.txt.length > 3, drag.uri + ' | ' + drag.txt);
+      await settle(200);
+      check('table renders after drag', (await page.locator(rows).count()) > 0);
+      check('inspector offers copy file to clipboard', (await page.locator('#ins-clipfile').count()) === 1);
+      await page.keyboard.press('?');
+      check('keys dialog lists retrigger', /Retrigger/.test(await page.textContent('#keys-dlg')));
+      await page.keyboard.press('Escape');
+      check('no horizontal page overflow (deck)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await shot('11-media-deck');
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await settle(300);
+      await shot('11-media-deck-1920');
+      await page.setViewportSize({ width: 1366, height: 768 });
+      await settle(200);
+    }
+    // <<< media checks
+    //
+    //
+    // >>> collections checks (owned by the collections feature; insert between these lines)
+    {
+      if (fixture) check('scan summary shows new files card', /new since last run/.test(await page.textContent('#scan-summary')));
+      await page.click('.rail-btn[data-view="library"]');
+      await page.waitForSelector(rows, { timeout: 10000 });
+      await page.click('#lib-clear').catch(() => {});
+      await settle(400);
+      check('collections sidebar renders Favorites', (await page.locator('#coll-list .ck[data-c="fav"]').count()) === 1);
+      check('packs list still visible beside collections', await page.$eval('#pack-list', (el) => el.getBoundingClientRect().height > 200));
+      const totalAll = await countOf('#lib-count');
+      if (fixture) {
+        // star the first row with S
+        await page.click(`${rows} >> nth=0`);
+        await settle(300);
+        await page.keyboard.press('Space'); // stop the audition it started
+        await page.keyboard.press('s');
+        await settle(500);
+        check('S stars the current sample', (await page.locator(`${rows} >> nth=0`).locator('.ib.star.on').count()) === 1);
+        check('star button in inspector', (await page.locator('#ins-star.on').count()) === 1);
+        const favN = await page.$eval('#coll-list .ck[data-c="fav"] .ck-n', (e) => parseInt(e.textContent, 10));
+        check('Favorites count updates', favN >= 1, String(favN));
+        await page.click('#coll-list .ck[data-c="fav"]');
+        await settle(500);
+        check('Favorites filters the table', (await countOf('#lib-count')) === favN && (await page.locator('#lib-chips .chip').count()) === 1);
+        await page.click('#coll-list .ck[data-c="fav"]');
+        await settle(400);
+        // star column toggles off again
+        await page.click(`${rows} >> nth=0 >> .ib.star`);
+        await settle(500);
+        check('star column toggles', (await page.locator(`${rows} >> nth=0`).locator('.ib.star.on').count()) === 0);
+        // New filter chip
+        const newN = parseInt((await page.textContent('#lib-new-n')).replace(/\D/g, ''), 10);
+        await page.click('#lib-new');
+        await settle(500);
+        check('New filter chip', (await page.locator('#lib-chips .chip').filter({ hasText: 'New' }).count()) === 1 && (await page.getAttribute('#lib-new', 'aria-pressed')) === 'true');
+        check('New filter narrows the table', (await countOf('#lib-count')) > 0 && (await countOf('#lib-count')) <= newN && (await countOf('#lib-count')) < totalAll);
+        await shot('11-collections');
+        await page.click('#lib-new');
+        await settle(400);
+        check('New filter clears', (await countOf('#lib-count')) === totalAll);
+      }
+    }
+    // <<< collections checks
+    //
+    //
+    // >>> undo checks (owned by the undo feature; insert between these lines)
+    await page.click('.rail-btn[data-view="log"]');
+    await settle(700);
+    check('undo button exists in Move Log', (await page.locator('#view-log #log-undo').count()) === 1);
+    if (fixture) {
+      check('undo button visible and enabled', (await page.isVisible('#log-undo')) && (await page.isEnabled('#log-undo')));
+      await page.click('#log-undo');
+      await page.waitForSelector('#undo-dlg[open]', { timeout: 5000 });
+      check('undo dialog lists moves and links', /moved back/.test(await page.textContent('#undo-table')) && /kit hard link/.test(await page.textContent('#undo-table')));
+      await shot('11-undo-dialog');
+      await page.click('#undo-go');
+      await page.waitForFunction(() => location.hash === '#review', null, { timeout: 10000 });
+      await page.waitForSelector('#undo-banner:not([hidden])', { timeout: 10000 });
+      await settle(700);
+      check('undo plan banner renders', /Undo plan/.test(await page.textContent('#undo-banner')) && /go back to their original folders/.test(await page.textContent('#undo-banner')));
+      check('undo plan cards', /move back/.test(await page.textContent('#plan-cards')) && /remove kit link/.test(await page.textContent('#plan-cards')));
+      check('rebuild button names the undo plan', /undo/i.test(await page.textContent('#plan-build')));
+      check('undo columns relabelled', /Goes back to/.test(await page.textContent('#op-table .vt-head')));
+      const acts = await page.$$eval('#op-table .vt-row:not(.is-ph) .act', (b) => b.map((x) => x.textContent));
+      check('undo ops use undo actions only', acts.length > 0 && acts.every((a) => ['Move', 'Unlink', 'Hold', 'Keep'].includes(a)), acts.slice(0, 8).join(','));
+      await page.selectOption('#op-action', 'move');
+      await settle(500);
+      const mv = await page.$$eval('#op-table .vt-row:not(.is-ph) .act', (b) => b.map((x) => x.textContent));
+      check('undo moves back listed', mv.length > 0 && mv.every((a) => a === 'Move'), mv.slice(0, 4).join(','));
+      await page.selectOption('#op-action', '');
+      await settle(400);
+      check('no horizontal page overflow (undo review)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await page.click('#op-table .vt-row:not(.is-ph)');
+      await settle(300);
+      check('undo op detail shows where it goes back', /Goes back to|File stays at/.test(await page.textContent('#op-detail')));
+      await shot('12-undo-review');
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await settle(500);
+      check('no horizontal page overflow (undo review 1920)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await shot('12-undo-review-1920');
+      await page.setViewportSize({ width: 1366, height: 768 });
+      await settle(300);
+    }
+    // <<< undo checks
+    //
+    //
+    // >>> findsounds checks (owned by the findsounds feature; insert between these lines)
+    {
+      // ---------- Find Sounds ----------
+      await page.click('.rail-btn[data-view="find"]');
+      await page.waitForSelector('#find-h', { timeout: 5000 });
+      await settle(400);
+      check('find: view renders', /Find Sounds/.test(await page.textContent('#find-h')));
+      if (fixture) {
+        check('find: no-key state offers inline key and settings link', await page.isVisible('#fs-key-in') && (await page.locator('#fs-to-settings').count()) === 1);
+        await shot('11-find-nokey');
+        await page.fill('#fs-key-in', 'fixturekey123456');
+        await page.click('#fs-keyform button[type=submit]');
+        await page.waitForSelector('#fs-q', { state: 'visible' });
+        await settle(300);
+        check('find: CC0 chip on by default', (await page.getAttribute('#fs-cc0', 'aria-pressed')) === 'true');
+        check('find: attribution off by default', (await page.getAttribute('#fs-attr', 'aria-pressed')) === 'false');
+        check('find: NonCommercial never offered', (await page.locator('#view-find button:has-text("NonCommercial"), #view-find input[value*="NonCommercial" i]').count()) === 0 && /never shown/.test(await page.textContent('.fs-nc')));
+        check('find: quota visible', /\d+ \/ 2,000/.test(await page.textContent('#fs-quota')));
+        await page.fill('#fs-q', 'kick');
+        await page.press('#fs-q', 'Enter');
+        await page.waitForSelector('#fs-results .fs-list .fs-row', { timeout: 5000 });
+        const n0 = await page.locator('#fs-results .fs-list .fs-row').count();
+        check('find: search renders results', n0 > 0, `rows=${n0}`);
+        check('find: only CC0 badges by default', (await page.locator('#fs-results .fs-badge.fs-by').count()) === 0 && (await page.locator('#fs-results .fs-badge.fs-cc0').count()) === n0);
+        check('find: Open on Freesound opens a new tab', (await page.getAttribute('#fs-results .fs-row a.btn', 'target')) === '_blank');
+        check('find: quota counts the search', /1 \/ 2,000/.test(await page.textContent('#fs-quota')));
+        await page.fill('#fs-q', '');
+        await page.click('#fs-attr');
+        await page.waitForSelector('#fs-results .fs-badge.fs-by', { timeout: 5000 });
+        check('find: attribution toggle adds CC BY results', (await page.getAttribute('#fs-attr', 'aria-pressed')) === 'true');
+        await page.waitForSelector('#fs-pager:not([hidden])', { timeout: 5000 });
+        await page.click('#fs-next');
+        await settle(400);
+        check('find: next page', /Page 2 of/.test(await page.textContent('#fs-page')));
+        await page.click('#fs-results .fs-row [data-act="dl"]');
+        await page.waitForSelector('#fs-results .fs-saved', { timeout: 5000 });
+        check('find: download marks row saved', (await page.locator('#fs-results .fs-saved').count()) === 1);
+        check('find: preview fallback labelled lower quality', /lower quality/.test(await page.textContent('#fs-side')));
+        check('find: no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        await shot('12-find-results');
+        await page.setViewportSize({ width: 1920, height: 1080 });
+        await settle(300);
+        await shot('12b-find-results-1080');
+        check('find: no horizontal overflow at 1920', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        await page.setViewportSize({ width: 1366, height: 768 });
+        await page.fill('#fs-q', 'ratelimit');
+        await page.press('#fs-q', 'Enter');
+        await page.waitForSelector('.fs-b-wait', { timeout: 5000 });
+        check('find: rate-limited banner shows wait', /try again in \d+ s/i.test(await page.textContent('#fs-banner')));
+        await shot('13-find-ratelimited');
+        await page.fill('#fs-q', 'offline');
+        await page.press('#fs-q', 'Enter');
+        await page.waitForSelector('.fs-b-off', { timeout: 5000 });
+        check('find: offline banner', /Offline/.test(await page.textContent('#fs-banner')));
+        await page.fill('#fs-q', '');
+      } else {
+        check('find: shows key form or search box', await page.isVisible('#fs-key-in') || await page.isVisible('#fs-q'));
+        await shot('11-find');
+      }
+    }
+    // <<< findsounds checks
+    //
+    //
+    // >>> settings checks (owned by the settings feature; insert between these lines)
+    {
+      const rowH = async () => {
+        await page.click('.rail-btn[data-view="library"]');
+        await page.waitForSelector(rows, { timeout: 10000 });
+        await settle(300);
+        return page.evaluate((s) => document.querySelector(s).getBoundingClientRect().height, rows);
+      };
+      const h0 = await rowH();
+      await page.click('.rail-btn[data-view="settings"]');
+      await page.waitForSelector('#settings-h', { state: 'visible', timeout: 5000 });
+      await settle(500);
+      check('settings: title', (await page.title()).startsWith('Settings'));
+      check('settings: collection folder prefilled', (await page.inputValue('#set-root')).length > 0);
+      check('settings: port field', /^\d{4,5}$/.test(await page.inputValue('#set-port')));
+      check('settings: volume slider', /^\d{1,3}$/.test(await page.inputValue('#set-vol')));
+      check('settings: auto-audition checkbox', await page.isVisible('#set-auto'));
+      check('settings: density control', (await page.locator('#set-density [role=radio]').count()) === 2);
+      check('settings: freesound section renders', await page.locator('#set-fs-na, #set-fs-key, #set-fs .err').count() > 0);
+      const about = await page.textContent('#set-about');
+      check('settings: version, data folder and log file shown', /\d+\.\d+\.\d+/.test(about) && /Log file/.test(about) && /App data folder/.test(about), about.slice(0, 160));
+      check('settings: no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await shot('11-settings-1366');
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await settle(300);
+      await shot('11-settings-1920');
+      await page.setViewportSize({ width: 1366, height: 768 });
+      // Switch dialog explains what is cleared; cancelling changes nothing.
+      await page.fill('#set-root', 'D:\\Other Packs');
+      await page.click('#set-switch');
+      await page.waitForSelector('#set-switch-dlg[open]', { timeout: 3000 });
+      check('settings: switch dialog explains plan/approval is cleared', /plan and any approval/.test(await page.textContent('#set-switch-dlg')));
+      await shot('12-settings-switch');
+      await page.click('#set-switch-dlg button[value=cancel]');
+      await settle(200);
+      check('settings: cancel keeps the dialog closed', !(await page.isVisible('#set-switch-dlg')));
+      if (fixture) {
+        await page.fill('#set-port', '80');
+        await page.click('#set-port-save');
+        check('settings: invalid port rejected', await page.isVisible('#set-port-err'));
+        await page.click('#set-density [data-d="compact"]');
+        await settle(300);
+        check('settings: compact sets body class', await page.evaluate(() => document.body.classList.contains('density-compact')));
+        const h1 = await rowH();
+        await shot('13-library-compact');
+        check('settings: compact density shrinks rows', h1 < h0, `${h0} -> ${h1}`);
+        await page.click('.rail-btn[data-view="settings"]');
+        await page.click('#set-density [data-d="comfortable"]');
+        const h2 = await rowH();
+        check('settings: comfortable density restores rows', h2 === h0, `${h0} -> ${h2}`);
+      }
+      await page.click('#btn-keys');
+      await page.waitForSelector('#keys-dlg[open]');
+      check('keys dialog shows version', /\d+\.\d+\.\d+/.test(await page.textContent('#app-version')));
+      await shot('14-keys-version');
+      await page.click('#keys-dlg .dlg-actions .btn');
+      await page.click('.rail-btn[data-view="scan"]');
+      await settle(300);
+    }
+    // <<< settings checks
+    //
+    //
     // ---------- Focus ring visible ----------
     await page.focus('.rail-btn[data-view="library"]');
     await page.keyboard.press('Shift+Tab');

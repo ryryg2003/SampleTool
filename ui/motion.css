@@ -1,0 +1,66 @@
+/* Prism Aurora motion (docs/UI_PLAN.md "Motion"). Linked last. All off under
+   prefers-reduced-motion; glow pulses also off with Reduce effects. */
+
+@keyframes pa-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes pa-pulse {
+  0%, 100% { box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 35%, transparent); }
+  50% { box-shadow: 0 0 22px 2px color-mix(in srgb, var(--accent) 65%, transparent); }
+}
+@keyframes pa-eq { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
+
+/* Entry: cards and stat tiles, staggered ~20ms, capped. */
+.glass, .head-card, .stat, .mbox {
+  animation: pa-enter 260ms cubic-bezier(.2, .7, .2, 1) both;
+  animation-delay: calc(min(var(--i, 0), 12) * 20ms);
+}
+:is(.glass, .head-card, .stat, .mbox):nth-child(2) { --i: 1; }
+:is(.glass, .head-card, .stat, .mbox):nth-child(3) { --i: 2; }
+:is(.glass, .head-card, .stat, .mbox):nth-child(4) { --i: 3; }
+:is(.glass, .head-card, .stat, .mbox):nth-child(5) { --i: 4; }
+:is(.glass, .head-card, .stat, .mbox):nth-child(6) { --i: 5; }
+:is(.glass, .head-card, .stat, .mbox):nth-child(n+7) { --i: 6; }
+
+/* Virtual table rows: only while .vt-enter is on (fresh list), never on scroll. */
+.vt-enter .vt-row {
+  animation: pa-enter 260ms cubic-bezier(.2, .7, .2, 1) both;
+  animation-delay: calc(min(var(--i, 0), 12) * 20ms);
+}
+.vt-enter .vt-row:nth-child(2) { --i: 1; }  .vt-enter .vt-row:nth-child(3) { --i: 2; }
+.vt-enter .vt-row:nth-child(4) { --i: 3; }  .vt-enter .vt-row:nth-child(5) { --i: 4; }
+.vt-enter .vt-row:nth-child(6) { --i: 5; }  .vt-enter .vt-row:nth-child(7) { --i: 6; }
+.vt-enter .vt-row:nth-child(8) { --i: 7; }  .vt-enter .vt-row:nth-child(9) { --i: 8; }
+.vt-enter .vt-row:nth-child(10) { --i: 9; } .vt-enter .vt-row:nth-child(11) { --i: 10; }
+.vt-enter .vt-row:nth-child(12) { --i: 11; } .vt-enter .vt-row:nth-child(n+13) { --i: 12; }
+
+/* Hover transitions (~150ms) where earlier tasks left gaps. */
+.vt-row, .pk, .row-play, .tp-play, #ins-play {
+  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, color .15s ease, transform .15s ease, filter .15s ease;
+}
+
+/* Glow pulse while playing. */
+#transport.is-playing .tp-play,
+.row-play.is-playing,
+#ins-play.is-playing { animation: pa-pulse 1.6s ease-in-out infinite; }
+
+/* Row EQ bars bounce. */
+.row-play.is-playing .eq > i { transform-origin: 50% 100%; animation: pa-eq .9s ease-in-out infinite; }
+.row-play.is-playing .eq > i:nth-child(2) { animation-duration: .7s; animation-delay: -.2s; }
+.row-play.is-playing .eq > i:nth-child(3) { animation-duration: 1.1s; animation-delay: -.45s; }
+
+/* Inspector playhead: core.js sets --playhead on :root and .is-live on the matching .ins-wave. */
+.ins-wave.is-live::after {
+  content: ""; position: absolute; top: 6px; bottom: 6px; width: 2px; border-radius: 2px; pointer-events: none;
+  left: calc(var(--playhead, 0) * 100%); transform: translateX(-1px);
+  background: #fff; box-shadow: 0 0 8px var(--accent), 0 0 2px #fff;
+}
+
+/* Reduce effects / reduced transparency: no glow pulses. */
+:root.reduce-fx :is(#transport.is-playing .tp-play, .row-play.is-playing, #ins-play.is-playing) { animation: none; }
+:root.reduce-fx .ins-wave.is-live::after { box-shadow: none; }
+@media (prefers-reduced-transparency: reduce) {
+  :is(#transport.is-playing .tp-play, .row-play.is-playing, #ins-play.is-playing) { animation: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

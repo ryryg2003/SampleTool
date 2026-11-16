@@ -51,6 +51,22 @@ class VTable {
       const row = this.getRow(+r.dataset.i); if (row && this.o.onRowDblClick) this.o.onRowDblClick(+r.dataset.i, row, ev);
     });
     this.body.addEventListener('keydown', (ev) => this.onKey(ev));
+    // Opt-in draggable rows: {draggable: true, onDragStart(i, row, ev) -> false to cancel, onDragEnd?(ev)}.
+    // Rows are not re-rendered while a drag is in flight so the drag source stays in the DOM.
+    this.rows.addEventListener('dragstart', (ev) => {
+      if (!this.o.draggable) return;
+      const r = ev.target.closest && ev.target.closest('.vt-row');
+      const row = r && !r.classList.contains('is-ph') ? this.getRow(+r.dataset.i) : null;
+      if (!row || !this.o.onDragStart || this.o.onDragStart(+r.dataset.i, row, ev) === false) { ev.preventDefault(); return; }
+      this.dragging = true;
+      r.classList.add('is-drag');
+    });
+    this.rows.addEventListener('dragend', (ev) => {
+      if (!this.dragging) return;
+      this.dragging = false;
+      if (this.o.onDragEnd) this.o.onDragEnd(ev);
+      this.render();
+    });
   }
 
   renderHead() {
@@ -83,6 +99,10 @@ class VTable {
     this.pages.clear();
     this.error = null;
     if (!keepScroll) { this.total = null; this.cursor = -1; this.body.scrollTop = 0; }
+    if (!keepScroll) { /* motion.css: entry animation on fresh lists only, never on scroll re-renders */
+      this.el.classList.add('vt-enter'); clearTimeout(this._enterT);
+      this._enterT = setTimeout(() => this.el.classList.remove('vt-enter'), 900);
+    }
     this.loadPage(Math.floor((keepScroll ? this.body.scrollTop / this.rh : 0) / this.o.pageSize));
     this.render();
   }
@@ -140,6 +160,7 @@ class VTable {
   }
 
   render() {
+    if (this.dragging) return; // re-rendered on dragend
     const total = this.total || 0;
     this.spacer.style.height = total * this.rh + 'px';
     this.body.setAttribute('aria-rowcount', String(total));
@@ -179,7 +200,7 @@ class VTable {
       if (!row) { html += `<div class="vt-row is-ph" style="top:${i * this.rh}px" aria-hidden="true"><span class="ph"></span></div>`; prev = null; continue; }
       const sel = this.o.isSelected ? this.o.isSelected(row, i) : false;
       const extra = this.o.rowClass ? this.o.rowClass(row, i, prev) : '';
-      html += `<div class="vt-row${i === this.cursor ? ' cursor' : ''}${sel ? ' sel' : ''} ${extra}" role="row" id="${this.el.id}-r${i}" data-i="${i}" aria-rowindex="${i + 1}" aria-selected="${sel ? 'true' : 'false'}" style="top:${i * this.rh}px">`;
+      html += `<div class="vt-row${i === this.cursor ? ' cursor' : ''}${sel ? ' sel' : ''} ${extra}" role="row" id="${this.el.id}-r${i}" data-i="${i}" aria-rowindex="${i + 1}" aria-selected="${sel ? 'true' : 'false'}"${this.o.draggable ? ' draggable="true"' : ''} style="top:${i * this.rh}px">`;
       for (const c of cols) html += `<span class="vt-td ${c.cls || ''}" role="gridcell"${c.title ? ` title="${esc(c.title(row))}"` : ''}>${c.render(row, i, prev)}</span>`;
       html += '</div>';
       prev = row;

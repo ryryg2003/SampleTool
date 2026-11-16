@@ -1,0 +1,19 @@
+/* undo.css: styles owned by the undo feature. Uses the tokens from app.css. */
+.act-unlink { background: var(--link); }  /* ruling 9: links are violet; the tile tone is in views.css */
+
+.banner-undo { background: var(--raised); border: 1px solid var(--sel-line); color: var(--text); border-radius: var(--r-in); }
+.banner-undo strong { color: var(--text); font-family: var(--f-label); white-space: nowrap; }
+.banner-undo .ub-text { min-width: 0; }
+.banner-undo .ub-warn { color: var(--warn); }
+.banner-undo code { color: var(--text); }
+
+.undo-state { font: 600 12px var(--f-label); color: var(--muted); }
+.undo-state .us-done { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); padding: 4px 8px; border-radius: var(--r-s); }
+.undo-state .us-part { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn-ink); padding: 4px 8px; border-radius: var(--r-s); }
+
+.undo-dlg .dlg-table td:first-child { width: 90px; }
+.undo-pick { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 10px; }
+.undo-pick select { max-width: 100%; }
+
+/* Undo plans: review cards fit five across */
+.view-review .cards.cards-undo { grid-template-columns: repeat(5, minmax(0, 1fr)); }
