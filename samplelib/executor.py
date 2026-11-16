@@ -25,7 +25,9 @@ from .winfs import (IS_WINDOWS, file_identity, is_locked_error, is_reparse_point
                     is_within, long_path, name_key, path_key,
                     same_volume)
 
-WRITE_ACTIONS = ("move", "link")
+WRITE_ACTIONS = ("move", "link", "unlink")
+# "unlink" exists only in undo plans (plan["kind"] == "undo"): it removes a hard
+# link a forward run created, never the last name of a file.
 PROGRESS_INTERVAL = 0.1
 
 # errno / winerror values meaning "this volume cannot hard link".
@@ -114,12 +116,13 @@ def _dest_exists(dest: str) -> bool:
         return True
 
 
-def _check_dest_ancestors(dest: str, dest_root: str | None) -> str | None:
+def _check_dest_ancestors(dest: str, dest_root: str | None,
+                          label: str = "library folder") -> str | None:
     """Refuse if dest is outside dest_root or any existing ancestor is a reparse point."""
     parent = os.path.dirname(os.path.abspath(dest))
     if dest_root:
         if not is_within(dest, dest_root) or path_key(dest) == path_key(dest_root):
-            return f"destination is outside the library folder {dest_root}"
+            return f"destination is outside the {label} {dest_root}"
         chain = []
         cur = parent
         root_key = path_key(dest_root)
@@ -161,6 +164,34 @@ def _check_source_ancestors(src: str, root: str | None, dest_root: str | None) -
         if nxt == cur:
             return f"source is outside the collection folder {root}"
         cur = nxt
+
+
+def _check_undo_source(src: str, root: str | None, dest_root: str | None) -> str | None:
+    """Undo mode: the source must be inside the library folder (reverse of forward)."""
+    if not root or not dest_root:
+        return "undo plan has no collection or library folder; cannot verify source location"
+    if not is_within(src, dest_root) or path_key(src) == path_key(dest_root):
+        return f"undo source is outside the library folder {dest_root}"
+    cur = os.path.dirname(os.path.abspath(src))
+    root_key = path_key(root)
+    while True:
+        if os.path.lexists(long_path(cur)) and is_reparse_point(cur):
+            return f"source folder {cur} is a reparse point (junction/symlink)"
+        if path_key(cur) == root_key:
+            return None
+        nxt = os.path.dirname(cur)
+        if nxt == cur:
+            return f"source is outside the collection folder {root}"
+        cur = nxt
+
+
+def _check_undo_dest(dest: str, root: str | None, dest_root: str | None) -> str | None:
+    """Undo mode: the destination must be inside root but NOT inside the library folder."""
+    if not root or not dest_root:
+        return "undo plan has no collection or library folder; cannot verify destination"
+    if is_within(dest, dest_root):
+        return f"undo destination is inside the library folder {dest_root}"
+    return _check_dest_ancestors(dest, root, "collection folder")
 
 
 def _partial_path(dest: str, opid: str) -> str:
@@ -266,10 +297,14 @@ def _validate_source(path: str, op: dict, check_mtime: bool, label: str) -> None
         raise _Held(f"{label} content changed since approval (SHA-256 mismatch)")
 
 
-def _validate_dest(dest: str, src: str, dest_root: str | None) -> None:
+def _validate_dest(dest: str, src: str, dest_root: str | None,
+                   undo_root: str | None = None) -> None:
     if not dest:
         raise _Held("operation has no destination")
-    msg = _check_dest_ancestors(dest, dest_root)
+    if undo_root is not None:
+        msg = _check_undo_dest(dest, undo_root, dest_root)
+    else:
+        msg = _check_dest_ancestors(dest, dest_root)
     if msg:
         raise _Held(msg)
     if _dest_exists(dest):
@@ -307,14 +342,17 @@ def _remove_source_or_rollback(op: dict, src: str, dest: str) -> tuple[str, str 
         return "held", f"{why}: {_err(e)}; new destination link removed, nothing changed"
 
 
-def _do_move(op: dict, j: _Journal, dest_root: str | None, resume: bool) -> dict:
+def _do_move(op: dict, j: _Journal, dest_root: str | None, resume: bool,
+             undo_root: str | None = None) -> dict:
     src, dest, opid, sha = op["source"], op.get("dest"), op["id"], op.get("sha256")
     if resume:
         r = _reconcile_move(op, j)
         if r is not None:
             return r
     _validate_source(src, op, True, "source")
-    _validate_dest(dest, src, dest_root)
+    if undo_root is not None and op.get("file_id") and file_identity(src) != op["file_id"]:
+        raise _Held("file changed since the run (it is a different file now)")
+    _validate_dest(dest, src, dest_root, undo_root)
     j.write(opid, "start", action="move", source=src, dest=dest)
     _makedirs(os.path.dirname(dest))
     src_id = file_identity(src)
@@ -451,12 +489,61 @@ def _do_link(op: dict, j: _Journal, dest_root: str | None, resume: bool) -> dict
     return {"status": "done", "error": None, "file_id": tid}
 
 
+def _do_unlink(op: dict, j: _Journal, root: str | None, dest_root: str | None,
+               resume: bool) -> dict:
+    """Undo of a forward ``link``: remove only that extra name of the file.
+
+    Allowed only while the link and its remaining target are still the same file
+    (identity), the content still matches the plan (SHA-256), and the file has
+    another name, so the last name of a file is never removed.
+    """
+    link, target, opid = op.get("source") or "", op.get("link_to"), op["id"]
+    if not target:
+        raise _Held("unlink operation has no remaining target")
+    if resume and not os.path.lexists(long_path(link)):
+        if os.path.lexists(long_path(target)) and (
+                not op.get("file_id") or file_identity(target) == op["file_id"]):
+            return {"status": "done", "error": None, "file_id": file_identity(target),
+                    "note": "reconciled after interrupted run"}
+        return {"status": "failed", "error": "interrupted unlink: the remaining file is missing"}
+    bad = _check_undo_source(link, root, dest_root)
+    if bad:
+        raise _Held(bad)
+    if path_key(link) == path_key(target):
+        raise _Held("link and target are the same path")
+    _validate_source(link, op, True, "link")
+    if not os.path.lexists(long_path(target)) or is_reparse_point(target):
+        raise _Held("the file this link points to no longer exists; removing the link "
+                    "could remove the last copy")
+    lid, tid = file_identity(link), file_identity(target)
+    if lid is None or lid != tid:
+        raise _Held("the link and the file it points to are no longer the same file")
+    if op.get("file_id") and lid != op["file_id"]:
+        raise _Held("file changed since the run (it is a different file now)")
+    try:
+        nlink = _stat(link).st_nlink
+    except OSError as e:
+        raise _Held(f"cannot stat link: {_err(e)}")
+    if nlink < 2:
+        raise _Held("this is the last name of the file; not removed")
+    j.write(opid, "start", action="unlink", source=link, link_to=target)
+    try:
+        _unlink(link)
+    except OSError as e:
+        why = "link locked" if is_locked_error(e) else "could not remove link"
+        return {"status": "held", "error": f"{why}: {_err(e)}; nothing changed"}
+    if file_identity(target) != tid:
+        return {"status": "failed", "error": "remaining file missing after removing the link"}
+    return {"status": "done", "error": None, "file_id": tid}
+
+
 # ---------------------------------------------------------------------------
 # Ordering
 # ---------------------------------------------------------------------------
 def _order(ops: list) -> list:
-    """Moves first, then non-writing ops, then links; dependencies before dependents."""
-    rank = {"move": 0, "link": 2}
+    """Unlinks (undo plans only) first, then moves, then non-writing ops, then links;
+    dependencies before dependents."""
+    rank = {"unlink": -1, "move": 0, "link": 2}
     ordered = sorted(range(len(ops)), key=lambda i: (rank.get(ops[i].get("action"), 1), i))
     ids = {o.get("id") for o in ops}
     placed: set = set()
@@ -490,12 +577,13 @@ def execute(plan: dict, journal_path: str, progress, cancel=None) -> list[dict]:
     """
     ops = list(plan.get("ops") or [])
     dest_root = plan.get("dest_root")
+    undo_mode = plan.get("kind") == "undo"
     prior = _journal_state(read_journal(journal_path))
     journal = _Journal(journal_path)
     results: dict = {}
     status_by_id: dict = {}
     total = len(ops)
-    bytes_total = sum(int(o.get("size") or 0) for o in ops if o.get("action") in WRITE_ACTIONS)
+    bytes_total = sum(int(o.get("size") or 0) for o in ops if o.get("action") in ("move", "link"))
     prog = {"job": "execute", "phase": "executing", "running": True, "done": 0,
             "total": total, "bytes_done": 0, "bytes_total": bytes_total,
             "current": "", "warnings": 0, "errors": [], "message": ""}
@@ -533,6 +621,18 @@ def execute(plan: dict, journal_path: str, progress, cancel=None) -> list[dict]:
                                error=op.get("reason") or None)
                 else:
                     res.update(status="held", error=f"unknown action {action!r}")
+            elif action in ("unlink", "link") and (action == "unlink") != undo_mode:
+                res.update(status="held", error=(
+                    "unlink is only allowed in undo plans" if action == "unlink"
+                    else "undo plans cannot create links"))
+            elif prior.get(opid) == "done" and action == "unlink":
+                if not os.path.lexists(long_path(op.get("source") or "")) and \
+                        os.path.lexists(long_path(op.get("link_to") or "")):
+                    res.update(status="already-done",
+                               file_id=file_identity(op.get("link_to") or ""))
+                else:
+                    res.update(status="held", error="journal says done but the link "
+                               "still exists or its target is missing; not repeated")
             elif prior.get(opid) == "done":
                 d = op.get("dest")
                 try:
@@ -555,12 +655,21 @@ def execute(plan: dict, journal_path: str, progress, cancel=None) -> list[dict]:
                 else:
                     resume = prior.get(opid) == "start"
                     try:
-                        if action == "move":
+                        if action == "move" and undo_mode:
+                            bad = _check_undo_source(op.get("source") or "",
+                                                     plan.get("root"), dest_root)
+                            if bad:
+                                raise _Held(bad)
+                            r = _do_move(op, journal, dest_root, resume,
+                                         undo_root=plan.get("root"))
+                        elif action == "move":
                             bad = _check_source_ancestors(op.get("source") or "",
                                                           plan.get("root"), dest_root)
                             if bad:
                                 raise _Held(bad)
                             r = _do_move(op, journal, dest_root, resume)
+                        elif action == "unlink":
+                            r = _do_unlink(op, journal, plan.get("root"), dest_root, resume)
                         else:
                             r = _do_link(op, journal, dest_root, resume)
                     except _Held as h:
@@ -574,7 +683,7 @@ def execute(plan: dict, journal_path: str, progress, cancel=None) -> list[dict]:
                         rec["note"] = r["note"]
                     journal.write(opid, res["status"], dest=op.get("dest"),
                                   file_id=res["file_id"], **rec)
-                if res["status"] in ("done",):
+                if res["status"] in ("done",) and action != "unlink":
                     prog["bytes_done"] += int(op.get("size") or 0)
             res["timestamp"] = _now()
             status_by_id[opid] = res["status"]

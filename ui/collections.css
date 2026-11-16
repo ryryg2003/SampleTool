@@ -1,0 +1,59 @@
+/* collections.css: favorites, collections sidebar, star column, "New" filter. */
+
+/* ---------- sidebar section above Packs ---------- */
+.coll-side { flex: none; display: flex; flex-direction: column; max-height: 38%; min-height: 0; border-bottom: 1px solid var(--line-soft); }
+.coll-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 8px 4px 12px; }
+.coll-head .ib svg { width: 14px; height: 14px; }
+.coll-list { list-style: none; margin: 0; padding: 0 6px 8px; overflow-y: auto; min-height: 0; }
+.ck-row { position: relative; display: flex; }
+.ck { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; height: 26px; padding: 0 8px; background: none; border: 0; border-radius: var(--r-s); color: var(--text); cursor: pointer; font-size: 12.5px; text-align: left; position: relative; }
+.ck:hover { background: var(--raised); }
+.ck.on { background: var(--sel); }
+.ck.on::before { content: ""; position: absolute; left: 0; top: 5px; bottom: 5px; width: 2px; background: var(--amber); }
+.ck-ic { width: 13px; height: 13px; flex: none; color: var(--dim); }
+.ck-star { color: var(--amber); }
+.ck-name { min-width: 0; flex: 1; }
+.ck-n { flex: none; color: var(--dim); font-size: 11px; }
+.ck-tools { position: absolute; right: 1px; top: 1px; bottom: 1px; display: none; align-items: center; gap: 1px; padding-left: 6px; background: var(--raised); border-radius: var(--r-s); }
+.ck.on + .ck-tools { background: var(--sel); }
+.ck-tools .ib { width: 22px; height: 22px; }
+.ck-tools .ib svg { width: 13px; height: 13px; }
+.ck-row:hover .ck-tools, .ck-row:focus-within .ck-tools { display: flex; }
+.ck-sep { padding: 7px 8px 2px; font: 600 10.5px var(--f-label); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+.ck-hint { padding: 4px 8px 2px; font-size: 11.5px; }
+
+/* ---------- "New since last run" filter toggle ---------- */
+.fbtn { height: 27px; padding: 0 9px; display: inline-flex; align-items: center; gap: 6px; background: #1a1f24; border: 1px solid var(--line); border-radius: var(--r-s); color: var(--muted); cursor: pointer; font: 12.5px var(--f-body); white-space: nowrap; }
+.fbtn:hover { color: var(--text); border-color: #4a545f; }
+.fbtn b { font-weight: 500; font-size: 11px; color: var(--dim); }
+.fbtn.is-set { border-color: var(--amber); color: var(--text); background: #2a2519; }
+.fbtn.is-set b { color: #e9c77d; }
+
+/* ---------- star column + inspector ---------- */
+.c-star { justify-content: center; padding: 0; }
+.ib.star { width: 20px; height: 20px; color: #4a535d; border: 0; }
+.ib.star svg { width: 14px; height: 14px; }
+.vt-row:hover .ib.star:not(.on), .vt-row.cursor .ib.star:not(.on) { color: var(--muted); }
+.ib.star:hover:not(:disabled) { color: var(--amber); background: var(--hover); }
+.ib.star.on { color: var(--amber); }
+.ib.star:disabled { opacity: .35; cursor: not-allowed; }
+.ins-actions .ib.star { width: 26px; height: 26px; border: 1px solid var(--line); background: var(--raised); color: var(--muted); }
+.ins-actions .ib.star.on { color: var(--amber); border-color: rgba(240, 180, 60, .5); }
+.ins-colls { display: flex; flex-direction: column; gap: 5px; }
+.cchips { display: flex; flex-wrap: wrap; gap: 5px; }
+.cchip { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 11px; background: #2a3139; border: 1px solid var(--line); font-size: 12px; max-width: 100%; }
+.cchip .chip-x { width: 18px; height: 18px; margin-right: -6px; color: var(--muted); }
+.cchip .chip-x:hover { background: var(--hover); }
+.cchip-fav { color: #f3d48f; border-color: rgba(240, 180, 60, .45); }
+.cchip .ck-ic { width: 12px; height: 12px; }
+#coll-dlg { width: min(460px, calc(100vw - 32px)); }
+#coll-dlg select.input, #coll-dlg input.input { width: 100%; }
+.selbar .btn svg { margin-right: 4px; color: var(--amber); }
+.ins-actions .btn svg { margin-right: 0; }
+#ins-mstar svg { color: var(--amber); }
+.card.c-new.has-new::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 2px 2px 0; background: var(--amber); }
+.ins-actions .ins-collb:disabled { opacity: .35; cursor: not-allowed; }
+/* keep the inspector action row on one line with the added star + collect buttons */
+.ins-top .ins-actions { gap: 4px; }
+.ins-top .ins-actions .btn-small { padding: 0 7px; }
+.ins-actions .ib.star { width: 24px; }

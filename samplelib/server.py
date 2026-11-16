@@ -16,14 +16,37 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional
 
-from . import models
+from . import __version__, models
 from .store import Store
+
+# Feature modules plug in here. Each optional module samplelib/api_<name>.py may define:
+#   init(app)                       called once when the server starts
+#   get(handler, path, q) -> bool   return True when it handled (and answered) the GET
+#   post(handler, path, b) -> bool  return True when it handled (and answered) the POST
+#   MUTATING: set[str]              POST paths refused while an approved run is executing
+#   state(app) -> dict              extra keys merged into GET /api/state
+EXTENSION_NAMES = ("undo", "media", "collections", "freesound", "settings")
+
+
+def _load_extensions() -> list:
+    import importlib
+    mods = []
+    for n in EXTENSION_NAMES:
+        try:
+            mods.append(importlib.import_module(f"{__package__}.api_{n}"))
+        except ModuleNotFoundError as e:
+            if e.name != f"{__package__}.api_{n}":
+                raise
+    return mods
+
+
+EXTENSIONS = _load_extensions()
 
 UI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ui")
 
 AUDIO_TYPES = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg",
                ".flac": "audio/flac", ".m4a": "audio/mp4", ".aif": "audio/aiff",
-               ".aiff": "audio/aiff"}
+               ".aiff": "audio/aiff", ".aifc": "audio/aiff"}
 
 
 class App:
@@ -119,18 +142,24 @@ class App:
         self.set_progress({"job": "scan", "message":
                            f"Scan finished: {n_in} files found, {len(kit_list)} kits. Nothing was changed."})
 
-    def job_plan(self) -> None:
+    def job_plan(self, only_new: bool = False) -> None:
         from . import planner
         st = self.store
-        self.set_progress({"job": "plan", "phase": "planning", "message": "Building plan"})
+        self.set_progress({"job": "plan", "phase": "planning", "message":
+                           "Building plan for new files only" if only_new else "Building plan"})
         with st.lock:
             gen, root = st.gen, st.root
+            # duplicate detection always sees every item (library + all incoming)
             plan = planner.build_plan(st.items, st.kits, st.root, st.dest_root)
+            if only_new:
+                from . import incremental
+                plan = incremental.restrict_plan_to_new(plan, st.items)
         with st.lock:
             if os.path.normcase(st.root) != os.path.normcase(root):
                 raise RuntimeError("The collection folder changed while planning; plan discarded.")
             st.set_plan(plan, gen)
-        self.set_progress({"job": "plan", "message": f"Plan ready: {len(plan['ops'])} operations. Review, then approve."})
+        extra = f" ({plan['summary'].get('new_files', 0)} new files; the rest are kept for a later plan)" if only_new else ""
+        self.set_progress({"job": "plan", "message": f"Plan ready: {len(plan['ops'])} operations{extra}. Review, then approve."})
 
     def job_execute(self, plan_hash: str) -> None:
         self.executing = True
@@ -146,6 +175,9 @@ class App:
             if st.approved_hash != plan_hash or not st.plan or st.plan["plan_hash"] != plan_hash or st.plan_stale:
                 raise PermissionError("Plan is not approved")
             plan = st.plan
+        if plan.get("kind") == "undo":  # reverse plan from samplelib/undo.py
+            from . import undo
+            return undo.run_undo(self, plan, plan_hash)
         self.set_progress({"job": "execute", "phase": "executing", "total": len(plan["ops"])})
         results = executor.execute(plan, st.journal_path(plan_hash), self.set_progress, self.cancel)
         ex = {"plan_hash": plan_hash, "ts": time.time(), "results": results,
@@ -157,7 +189,8 @@ class App:
         self.set_progress({"job": "export", "phase": "reports", "message": "Writing catalog reports"})
         catalog_dir = os.path.join(plan["dest_root"], models.CATALOG_DIR)  # the approved destination
         with st.lock:
-            ex["reports"] = export.write_reports(catalog_dir, st.items, st.kits, plan, results)
+            ex["reports"] = export.write_reports(catalog_dir, st.items, st.kits, plan, results,
+                                                 collections=getattr(st, "collections", None))
             self.set_progress({"phase": "verifying", "message": "Verifying library"})
             ex["verification"] = export.verify_library(st.items, st.kits, plan, results)
         st.set_execution(ex)
@@ -307,7 +340,12 @@ class Handler(BaseHTTPRequestHandler):
             from .store import scan_summary
             with st.lock:
                 ssum = scan_summary(st) if st.items else None
-            return self._send(200, {"root": st.root, "dest_root": st.dest_root, "data_dir": st.data_dir,
+            extra: dict = {}
+            for ext in EXTENSIONS:
+                if hasattr(ext, "state"):
+                    extra.update(ext.state(app))
+            return self._send(200, {**extra, "version": __version__,
+                                    "root": st.root, "dest_root": st.dest_root, "data_dir": st.data_dir,
                                     "scan_summary": ssum,
                                     "has_inventory": bool(st.items), "progress": app.get_progress(),
                                     "plan": plan, "execution": ex,
@@ -385,18 +423,29 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, k)
         m = re.fullmatch(r"/api/audio/([\w-]+)", path)
         if m:
-            return self._audio(st.by_id[m.group(1)])
+            return self._audio(st.by_id[m.group(1)], q)
         if path == "/api/plan":
             return self._plan(q)
         if path == "/api/log":
             return self._log(q)
+        for ext in EXTENSIONS:
+            if hasattr(ext, "get") and ext.get(self, path, q):
+                return None
         return self._err(404, "Unknown endpoint")
 
-    def _audio(self, it: dict):
+    def _audio(self, it: dict, q: Optional[dict] = None):
         st = self.app.store
         path = st._final_paths.get(it["id"]) or it["abs_path"]
         if not os.path.isfile(path):
             path = it["abs_path"]
+        download = (q or {}).get("download") == "1"  # original bytes, e.g. drag to DAW
+        if not download:
+            try:
+                from . import api_media
+            except ImportError:
+                api_media = None  # type: ignore
+            if api_media and api_media.serve_converted(self, it, path):  # AIFF -> WAV on the fly
+                return
         size = os.path.getsize(path)
         ctype = AUDIO_TYPES.get(it["ext"], "application/octet-stream")
         start, end = 0, size - 1
@@ -423,6 +472,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(end - start + 1))
         if status == 206:
             self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        if download:
+            from .api_media import content_disposition
+            self.send_header("Content-Disposition", content_disposition(it["name"]))
         self.end_headers()
         with open(path, "rb") as f:  # read-only
             f.seek(start)
@@ -520,7 +572,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _api_post(self, path: str, b: dict):
         app, st = self.app, self.app.store
-        if path in self.MUTATING and (app.executing or (app.progress.get("running") and
+        mutating = set(self.MUTATING)
+        for ext in EXTENSIONS:
+            mutating |= set(getattr(ext, "MUTATING", ()))
+        if path in mutating and (app.executing or (app.progress.get("running") and
                                                         app.progress.get("job") in ("execute", "export"))):
             raise RuntimeError("Changes are locked while the approved plan is running.")
         if path == "/api/scan" and app.progress.get("running"):
@@ -563,7 +618,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/plan/build":
             if not st.items:
                 raise ValueError("Run a scan first")
-            app.start_job("plan", app.job_plan)
+            only_new = bool(b.get("only_new"))
+            if only_new and not any(i.get("is_new") and i["origin"] == "incoming" for i in st.items):
+                raise ValueError("Nothing is new since the last run. Build a full plan instead.")
+            app.start_job("plan", (lambda: app.job_plan(only_new=True)) if only_new else app.job_plan)
             return self._send(200, {"ok": True})
         if path == "/api/plan/approve":
             st.approve(str(b.get("plan_hash") or ""))
@@ -588,11 +646,17 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("File not found")
             winfs.reveal_in_explorer(p)
             return self._send(200, {"ok": True})
+        for ext in EXTENSIONS:
+            if hasattr(ext, "post") and ext.post(self, path, b):
+                return None
         return self._err(404, "Unknown endpoint")
 
 
 def serve(store: Store, host: str = "127.0.0.1", port: int = 8765) -> tuple[ThreadingHTTPServer, App]:
     app = App(store)
+    for ext in EXTENSIONS:
+        if hasattr(ext, "init"):
+            ext.init(app)
     handler = type("BoundHandler", (Handler,), {"app": app})
     last_err = None
     for p in [port] + list(range(port + 1, port + 20)) + [0]:

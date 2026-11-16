@@ -621,6 +621,20 @@ class TestPlanner(unittest.TestCase):
         self.assertEqual(o["action"], "keep")
         self.assertEqual(o["canonical"], lib["abs_path"])
 
+    def test_license_sidecar_travels_with_its_sound(self):
+        snd = self.c.add("_Freesound/alice/Kick Thump.wav", uniq(7))
+        side = self.c.add("_Freesound/alice/Kick Thump.wav.license.txt", b"CC0 by alice")
+        lone = self.c.add("_Freesound/alice/zzqx.wav.license.txt", b"orphan")
+        ks, p = self.plan()
+        ops = self.ops_by_item(p)
+        self.assertEqual(ops[snd["id"]]["action"], "move")
+        so = ops[side["id"]]
+        self.assertEqual(so["action"], "move")
+        self.assertEqual(so["dest"], ops[snd["id"]]["dest"] + ".license.txt")
+        self.assertEqual(so["depends_on"], ops[snd["id"]]["id"])
+        self.assertIn("sidecar", so["flags"])
+        self.assertEqual(ops[lone["id"]]["action"], "keep")  # no sound beside it
+
     def test_name_collision_suffix(self):
         self.c.add("Samples/One-Shots/Drums/Kick 01.wav", uniq(1), origin="library")
         a = self.c.add("PackA/Kicks/Kick 01.wav", uniq(2))

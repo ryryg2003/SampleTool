@@ -55,6 +55,8 @@ class Store:
         self._hay: dict[str, str] = {}
         self._dup_counts: dict[str, int] = {}
         self._final_paths: dict[str, str] = {}
+        from .collections import Collections
+        self.collections = Collections(data_dir)  # favorites/collections, keyed by sha256
         self._load_settings(root)
         self._load()
 
@@ -92,12 +94,14 @@ class Store:
         _atomic_write(self._p(name), raw)
 
     def _load_settings(self, root: str) -> None:
-        s = self._read_json("settings.json", {})
+        from . import settings
+        s = settings.load(self.data_dir)
         self.root = root or s.get("root") or (r"E:\Sample Packs" if os.name == "nt" else "")
         self.save_settings()
 
     def save_settings(self) -> None:
-        self._write_json("settings.json", {"root": self.root})
+        from . import settings  # merges, so other settings (port, volume, ...) are kept
+        settings.update(self.data_dir, {"root": self.root})
 
     def _load(self) -> None:
         inv = self._read_json("inventory.json.gz", None)
@@ -105,6 +109,10 @@ class Store:
         self.kit_edits = self._read_json("kit_edits.json", [])
         self.hash_cache = self._read_json("hash_cache.json.gz", {})
         self.analysis_cache = self._read_json("analysis_cache.json.gz", {})
+        kb = self._read_json(self.KNOWN_FILE, None) or {}
+        self.new_baseline = ({"ts": kb.get("ts"), "reason": kb.get("reason")}
+                             if os.path.normcase(kb.get("root", "")) == os.path.normcase(self.root) and kb
+                             else None)
         if inv and os.path.normcase(inv.get("root", "")) == os.path.normcase(self.root):
             self._set_inventory(inv["items"], inv["kits"], persist=False)
         p = self._read_json("plan.json.gz", None)
@@ -187,9 +195,26 @@ class Store:
                     pass
             self._reindex()
 
+    KNOWN_FILE = "known_files.json.gz"
+
+    def _mark_new(self, items: list) -> None:
+        """Set is_new on freshly scanned items (see incremental.py for the definition)."""
+        from . import incremental
+        base = self._read_json(self.KNOWN_FILE, None)
+        if base and os.path.normcase(base.get("root", "")) != os.path.normcase(self.root):
+            base = None
+        prev_ex_ts = (self.execution or {}).get("ts") if self.execution else None
+        base, changed = incremental.mark_new(items, self.items, list(self._final_paths.values()),
+                                             prev_ex_ts, base)
+        if changed:
+            base["root"] = self.root
+            self._write_json(self.KNOWN_FILE, base)
+        self.new_baseline = {"ts": base.get("ts"), "reason": base.get("reason")}
+
     def set_scan_result(self, items: list, kits: list, hash_cache: dict,
                         analysis_cache: Optional[dict] = None) -> None:
         with self.lock:
+            self._mark_new(items)
             self.hash_cache = hash_cache
             self._write_json("hash_cache.json.gz", hash_cache)
             if analysis_cache is not None:
@@ -406,9 +431,16 @@ class Store:
             self.execution = ex
             self._write_json("execution.json.gz", ex)
             self._index_results()
+            # Undo: keep a run history record that survives rescans and restarts.
+            if self.plan and self.plan.get("kind") != "undo":
+                from . import undo
+                undo.record_run(self, self.plan, ex)
 
     def _index_results(self) -> None:
         fp = {}
+        if (self.plan or {}).get("kind") == "undo":  # files went back to their scanned paths
+            self._final_paths = {}
+            return
         ops = {o["id"]: o for o in (self.plan or {}).get("ops", [])}
         for r in (self.execution or {}).get("results", []):
             o = ops.get(r.get("op_id"))
@@ -470,10 +502,13 @@ class Store:
             "channels": audio.get("channels"), "bits": audio.get("bits"),
             "sha256": it.get("sha256"), "kit_id": it.get("kit_id"),
             "kit_name": kit["name"] if kit else None, "excluded": bool(it.get("excluded")),
-            "preview": it.get("preview", "none"), "warnings": it.get("warnings", []),
+            "preview": _preview_kind(it), "warnings": it.get("warnings", []),
             "review_status": self.review_status(it), "proposed_dest": proposed,
             "final_path": self._final_paths.get(it["id"]),
             "dup_count": self._dup_counts.get(it.get("sha256") or "", 1),
+            "is_new": bool(it.get("is_new")),
+            "starred": self.collections.is_fav(it.get("sha256")),
+            "collections": self.collections.ids_for(it.get("sha256")),
             "prov": {k: {"source": (meta.get(k) or {}).get("source"),
                          "confidence": (meta.get(k) or {}).get("confidence")}
                      for k in models.META_KEYS},
@@ -508,9 +543,28 @@ class Store:
             bmax = float(g("bpm_max")) if g("bpm_max") else None
         except ValueError:
             bmin = bmax = None
+        only_new = g("new") in ("1", "true", "yes")
+        hashsets = []   # each must contain the item's sha256
+        if g("fav") in ("1", "true", "yes"):
+            hashsets.append(self.collections.hashes("fav"))
+        if g("collection"):
+            c = self.collections.get(g("collection"))
+            if c["kind"] == "smart":   # a smart collection is its saved search
+                merged = dict(c["params"] or {})
+                merged.update({k: v for k, v in q.items() if k != "collection" and v not in (None, "")})
+                mc = merged.get("collection")
+                if mc and (mc == g("collection") or
+                           any(x["id"] == mc and x["kind"] == "smart" for x in self.collections.colls)):
+                    merged.pop("collection")   # no smart-in-smart (avoids loops)
+                return self.query(merged)
+            hashsets.append(set(c["members"]))
         with self.lock:
             out = []
             for it in self.items:
+                if only_new and not it.get("is_new"):
+                    continue
+                if hashsets and not all(it.get("sha256") in hs for hs in hashsets):
+                    continue
                 if terms:
                     hay = self._haystack(it)
                     if not all(t in hay for t in terms):
@@ -620,9 +674,20 @@ def _is_unknown(sort: str, it: dict, st: Store) -> bool:
     return False
 
 
+def _preview_kind(it: dict) -> str:
+    """AIFF auditions through the WAV converter; decided at row time so inventories
+    saved by older versions (preview="unsupported") work without a rescan."""
+    try:
+        from .audiocodec import preview_kind
+    except ImportError:
+        return it.get("preview", "none")
+    return preview_kind(it)
+
+
 def scan_summary(st: "Store") -> dict:
     """Counts the Scan screen can show before any plan exists."""
     inc = [i for i in st.items if i["origin"] == "incoming"]
+    new_inc = [i for i in inc if i.get("is_new")]
     by_hash: dict = {}
     for i in st.items:
         if i.get("sha256"):
@@ -656,4 +721,9 @@ def scan_summary(st: "Store") -> dict:
                       if st.plan and not st.plan_stale else collisions,
         "needs_review": statuses.get("needs-review", 0),
         "held": statuses.get("held", 0),
+        "new_files": len(new_inc),
+        "new_bytes": sum(i["size"] for i in new_inc),
+        "new_packs": len({i.get("pack") for i in new_inc if i.get("pack")}),
+        "new_library_files": sum(1 for i in st.items if i["origin"] == "library" and i.get("is_new")),
+        "new_baseline": getattr(st, "new_baseline", None),
     }

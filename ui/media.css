@@ -1,0 +1,48 @@
+/* media.css: owned by the media feature. Waveform deck, retrigger toggle, drag rows,
+   inspector extras. Uses the console tokens from app.css. */
+
+.transport { height: 60px; }
+.tp-track { gap: 3px; }
+.tp-name { line-height: 16px; }
+
+/* Waveform: a recessed LCD-like strip, same treatment as the time readout */
+.tp-wave {
+  position: relative; height: 30px; min-width: 0;
+  background: #0e1114; border: 1px solid #000; border-radius: var(--r-s);
+  box-shadow: inset 0 1px 6px rgba(0, 0, 0, .6);
+  cursor: pointer; touch-action: none; overflow: hidden;
+}
+.tp-wave-c { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tp-wave-ph {
+  position: absolute; left: 8px; top: 50%; transform: translateY(-50%); max-width: calc(100% - 16px);
+  padding: 0 6px; background: #0e1114; color: var(--dim); font-size: 11.5px; line-height: 16px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+}
+.tp-wave:not(.is-empty) .tp-wave-ph { display: none; }
+.tp-wave[data-state="loading"] .tp-wave-ph { color: var(--muted); }
+.tp-wave[data-state="empty"] { cursor: default; }
+
+/* The range input stays focusable and keyboard-operable on top of the canvas, but is invisible;
+   pointer input is handled by the wave strip so clicks land exactly where the user points. */
+.tp-wave .scrub { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
+.tp-wave:has(.scrub:focus-visible) { box-shadow: inset 0 1px 6px rgba(0, 0, 0, .6), 0 0 0 2px var(--bg), 0 0 0 4px var(--amber); }
+
+/* Message with an action (e.g. Show in Explorer for REX) */
+.tp-msg.has-act { max-height: 48px; }
+.tp-msg-act {
+  background: none; border: 0; padding: 0; margin-left: 2px; cursor: pointer;
+  color: var(--amber); font: inherit; text-decoration: underline; text-underline-offset: 2px;
+}
+.tp-msg-act:hover { color: #f5c25a; }
+
+/* Draggable library rows */
+.vt-row[draggable="true"] { -webkit-user-drag: element; }
+.vt-row.is-drag { opacity: .55; }
+
+/* Inspector: REX note with a Reveal button */
+.media-note { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.media-note .btn { color: var(--text); }
+
+@media (max-width: 1440px) {
+  .tp-msg { flex-basis: 220px; }
+}
