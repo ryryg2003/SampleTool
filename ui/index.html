@@ -231,16 +231,22 @@
   <footer class="deck">
     <div class="transport glass" id="transport" aria-label="Audition player">
       <button class="tp-btn tp-play" id="tp-play" aria-label="Play" title="Play / stop (Space)"><svg><use href="#i-play"/></svg></button>
-      <button class="tp-btn tp-toggle" id="tp-loop" aria-label="Loop" aria-pressed="false" title="Loop (L)"><svg><use href="#i-loop"/></svg></button>
-      <div class="tp-readout" aria-live="off">
-        <span class="tp-time mono" id="tp-time">0:00.0</span>
-        <span class="tp-dur mono" id="tp-dur">/ 0:00.0</span>
-      </div>
-      <div class="tp-track">
+      <div class="tp-meta">
         <div class="tp-name ellip" id="tp-name">Nothing loaded</div>
-        <input type="range" class="scrub" id="tp-scrub" min="0" max="1000" value="0" step="1" aria-label="Playback position" disabled>
+        <div class="tp-msg" id="tp-msg" role="status"></div>
+        <div class="tp-sub ellip" id="tp-sub"></div>
       </div>
-      <div class="tp-msg" id="tp-msg" role="status"></div>
+      <div class="tp-track" aria-live="off">
+        <span class="tp-time mono" id="tp-time">0:00.0</span>
+        <div class="tp-wave" id="tp-wave-box">
+          <canvas class="tp-wave-c tp-wave-base" id="tp-wave" aria-hidden="true"></canvas>
+          <canvas class="tp-wave-c tp-wave-lit" id="tp-wave-lit" aria-hidden="true"></canvas>
+          <input type="range" class="scrub" id="tp-scrub" min="0" max="1000" value="0" step="1" aria-label="Playback position" disabled>
+        </div>
+        <span class="tp-dur mono" id="tp-dur">0:00.0</span>
+      </div>
+      <button class="tp-btn tp-toggle" id="tp-loop" aria-label="Loop" aria-pressed="false" title="Loop (L)"><svg><use href="#i-loop"/></svg></button>
+      <canvas class="tp-spec" id="tp-spec" aria-hidden="true"></canvas>
       <label class="tp-auto" title="Play each sample as you move with the arrow keys"><input type="checkbox" id="tp-auto"> Auto-play on arrows</label>
       <div class="tp-vol"><svg aria-hidden="true"><use href="#i-vol"/></svg><input type="range" id="tp-vol" min="0" max="100" value="80" aria-label="Volume"></div>
       <audio id="audio" preload="none"></audio>
