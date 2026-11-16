@@ -436,7 +436,7 @@ class Store:
             "channels": audio.get("channels"), "bits": audio.get("bits"),
             "sha256": it.get("sha256"), "kit_id": it.get("kit_id"),
             "kit_name": kit["name"] if kit else None, "excluded": bool(it.get("excluded")),
-            "preview": it.get("preview", "none"), "warnings": it.get("warnings", []),
+            "preview": _preview_kind(it), "warnings": it.get("warnings", []),
             "review_status": self.review_status(it), "proposed_dest": proposed,
             "final_path": self._final_paths.get(it["id"]),
             "dup_count": self._dup_counts.get(it.get("sha256") or "", 1),
@@ -584,6 +584,16 @@ def _is_unknown(sort: str, it: dict, st: Store) -> bool:
     if sort == "duration":
         return not (it.get("audio") or {}).get("duration_s")
     return False
+
+
+def _preview_kind(it: dict) -> str:
+    """AIFF auditions through the WAV converter; decided at row time so inventories
+    saved by older versions (preview="unsupported") work without a rescan."""
+    try:
+        from .audiocodec import preview_kind
+    except ImportError:
+        return it.get("preview", "none")
+    return preview_kind(it)
 
 
 def scan_summary(st: "Store") -> dict:
