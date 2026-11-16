@@ -9,7 +9,7 @@
   background: none; border: 0; padding: 0; margin-left: 2px; cursor: pointer;
   color: var(--amber); font: inherit; text-decoration: underline; text-underline-offset: 2px;
 }
-.tp-msg-act:hover { color: #f5c25a; }
+.tp-msg-act:hover { color: var(--text); }
 
 /* Draggable library rows */
 .vt-row[draggable="true"] { -webkit-user-drag: element; }

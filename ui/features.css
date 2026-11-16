@@ -7,8 +7,8 @@
 .offgrid { color: var(--hold); margin-left: 2px; }
 .matches { margin-top: 14px; }
 .mchips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 8px; }
-.mchip { height: 22px; padding: 0 8px; border-radius: 11px; border: 1px solid var(--line); background: none; color: var(--muted); font-size: 11.5px; cursor: pointer; }
-.mchip.on { background: var(--amber-soft); border-color: rgba(240, 180, 60, .5); color: var(--text); }
+.mchip { height: 22px; padding: 0 8px; border-radius: var(--r-tag); border: 1px solid var(--line); background: var(--field); color: var(--muted); font-size: 11.5px; cursor: pointer; }
+.mchip.on { background: var(--amber-soft); border-color: var(--sel-line); color: var(--text); }
 .mchip:focus-visible, .mname:focus-visible { outline: none; box-shadow: var(--focus); }
 .mlist { list-style: none; margin: 0; padding: 0; }
 .mrow { display: grid; grid-template-columns: 26px minmax(0, 1fr) 44px; gap: 2px 6px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--line-soft); }
@@ -17,7 +17,7 @@
 .mscore { height: 4px; background: var(--line-soft); border-radius: 2px; overflow: hidden; }
 .mscore i { display: block; height: 100%; background: var(--move); }
 .mwhy { grid-column: 2 / -1; color: var(--dim); font-size: 11.5px; }
-.view-starter { padding: 20px 24px; overflow: auto; display: block; }
+.view-starter { overflow: auto; }
 .bs-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .bs-head p { margin: 4px 0 0; }
 .bs-ctl { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -25,7 +25,7 @@
 .bs-bar { display: flex; align-items: center; gap: 8px; margin: 16px 0 10px; }
 .bs-bar #bs-target { margin-right: auto; color: var(--amber); font-size: 15px; }
 .bs-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 22px; }
-.bs-slot { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-m); padding: 12px; min-width: 0; }
+.bs-slot { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-in); padding: 14px; min-width: 0; }
 .bs-slot.locked { border-color: var(--amber); }
 .bs-slot p { margin: 4px 0; }
 .bs-name { font-weight: 600; }
@@ -35,3 +35,20 @@
 .bs-set { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
 .bs-set .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 640px) { .view-starter { padding: 16px; } .bs-set { grid-template-columns: minmax(0, 1fr) auto auto; } .bs-set .small { grid-column: 1 / -1; grid-row: 2; } }
+
+/* Prism Aurora: Beat Starter header card + slot/match buttons as small icon-style buttons */
+.bs-head.vh-card { align-items: center; }
+.bs-head.vh-card .dim { color: rgba(255, 255, 255, .9); }
+.bs-head.vh-card .input { background: rgba(20, 8, 40, .38); border-color: rgba(255, 255, 255, .22); color: #fff; }
+.bs-slot.locked { box-shadow: 0 0 0 1px var(--sel-line), var(--glow); }
+.bs-acts .bs-play, .bs-acts .bs-lock, .bs-acts .bs-reroll {
+  height: 30px; padding: 0 10px; border-radius: var(--r-tag); border: 1px solid var(--line);
+  background: var(--raised); color: var(--muted); font: 600 12px var(--f-label); display: inline-flex; align-items: center; gap: 5px;
+}
+.bs-acts .bs-play svg { width: 13px; height: 13px; }
+.bs-acts .bs-play:hover:not(:disabled), .bs-acts .bs-lock:hover:not(:disabled), .bs-acts .bs-reroll:hover:not(:disabled) { color: var(--text); background: var(--hover); }
+.bs-acts .bs-lock[aria-pressed=true] { color: var(--text); background: var(--amber-soft); border-color: var(--sel-line); }
+.bs-acts .bs-reroll:disabled { opacity: .4; cursor: not-allowed; }
+.mrow .mplay { width: 26px; height: 26px; border-radius: var(--r-tag); border: 1px solid var(--line); background: var(--raised); color: var(--muted); }
+.mrow .mplay:hover { color: var(--text); background: var(--hover); }
+.mrow .mplay svg { width: 12px; height: 12px; }

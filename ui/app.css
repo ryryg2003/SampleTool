@@ -466,10 +466,23 @@ button.rs:hover { border-color: var(--muted); }
 @media (max-height: 800px) {
   .view { padding-top: 16px; gap: 10px; }
   .view-head h1 { font-size: 26px; }
-  .brand { padding-bottom: 6px; }
-  .rail-btn { padding: 8px 2px 7px; }
-  .rail-foot { gap: 8px; }
+  .rail { padding: 10px 0 10px; gap: 2px; }
+  .brand { padding-bottom: 4px; gap: 3px; }
+  .brand-mark { height: 16px; }
+  .brand-mark i:nth-child(2) { height: 16px; } .brand-mark i:nth-child(3) { height: 11px; }
+  .brand-mark i:nth-child(1) { height: 8px; } .brand-mark i:nth-child(4) { height: 5px; }
+  .brand-name { font-size: 9.5px; }
+  .rail-btn { padding: 6px 2px 5px; gap: 2px; font-size: 10.5px; border-radius: 14px; }
+  .rail-btn svg { width: 19px; height: 19px; }
+  .rail-foot { gap: 6px; }
+  .accent-pick { grid-template-columns: repeat(2, 16px); gap: 5px; }
+  .accent-pick [role=radio] { width: 16px; height: 16px; }
+  .rail-help, .rail-icon { width: 26px; height: 26px; }
+  .rail-icon svg { width: 14px; height: 14px; }
 }
+/* Never let the rail foot (accent, effects, ?) fall off the rail. */
+.rail-btn { flex: none; }
+.rail-foot { flex: none; }
 
 /* ---------- Reduce effects (toggle) and reduced transparency (OS setting) ----------
    Dialog and toast equivalents live in dialogs.css. */

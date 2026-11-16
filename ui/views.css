@@ -266,3 +266,4 @@ button.card:not(:disabled):focus-visible { box-shadow: var(--focus); border-radi
   .rs-chips { margin-top: 9px; }
   .verify details.raw { display: inline-block; margin: 6px 18px 0 0; vertical-align: top; }
 }
+#scan-summary .cards-scan { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }

@@ -549,7 +549,7 @@ const Library = {
         <div class="ins-wave cat-${catSlug(val('category'))}"><canvas class="wave-canvas" data-wave-for="${esc(d.id)}"></canvas></div>
         <div class="ins-actions">
           <button class="btn btn-primary ins-play${playing ? ' is-playing' : ''}" type="button" id="ins-play"><svg><use href="#i-${playing ? 'stop' : 'play'}"/></svg>${playing ? 'Stop' : 'Play'}</button>
-          <button class="btn" type="button" id="ins-edit"><svg><use href="#i-edit"/></svg>Edit</button>
+          <button class="btn" type="button" id="ins-edit" title="Edit"><svg><use href="#i-edit"/></svg>Edit</button>
           ${starBtn(d, ' ins-star').replace('tabindex="-1"', 'id="ins-star"')}
           <button class="ib ins-collb" type="button" id="ins-coll" aria-label="Add to collection" ${d.sha256 ? 'title="Add to collection…"' : `disabled title="${esc(NO_HASH_TIP)}"`}><svg viewBox="0 0 24 24"><path d="M4 7h11M4 12h11M4 17h7M18 14v6M15 17h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
           <button class="ib" type="button" id="ins-copy" aria-label="Copy original path" title="Copy original path"><svg><use href="#i-copy"/></svg></button>
