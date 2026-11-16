@@ -40,7 +40,7 @@ const Fmt = {
 };
 
 const STATUS_LABEL = { ok: 'OK', 'needs-review': 'Review', edited: 'Edited', held: 'Held', excluded: 'Excluded', done: 'Organized' };
-const ACTION_LABEL = { move: 'Move', link: 'Link', keep: 'Keep', hold: 'Hold', exclude: 'Exclude' };
+const ACTION_LABEL = { move: 'Move', link: 'Link', keep: 'Keep', hold: 'Hold', exclude: 'Exclude', unlink: 'Unlink' };
 const SOURCE_LABEL = { tag: 'Tag', filename: 'Filename', folder: 'Folder', inference: 'Inferred', analysis: 'Analysis', manual: 'Manual' };
 
 /* ---------------- Store (tiny localStorage wrapper) ---------------- */

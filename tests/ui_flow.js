@@ -135,6 +135,37 @@ async function waitIdle(timeout = 60000) {
     await shot('flow-06-log');
     check('verification reconciles', (await api('/api/state')).execution.verification.ok === true);
     // >>> undo checks (owned by the undo feature; insert between these lines)
+    // 8. Undo the run from the Move Log, approve and run the undo plan in Review
+    check('undo button offered for this run', (await page.isVisible('#log-undo')) && /Undo this run/.test(await page.textContent('#log-undo')));
+    await page.click('#log-undo');
+    await page.waitForSelector('#undo-dlg[open]');
+    await page.click('#undo-go');
+    await waitIdle();
+    await page.waitForSelector('#undo-banner:not([hidden])', { timeout: 10000 });
+    await sleep(800);
+    check('review shows the undo plan', /Undo plan/.test(await page.textContent('#undo-banner')) && (await api('/api/state')).plan.summary.kind === 'undo');
+    check('undo plan not approved yet', !(await api('/api/state')).plan.approved);
+    await shot('flow-07-undo-review');
+    await page.click('#plan-approve-open');
+    await page.waitForSelector('#approve-dlg[open]');
+    check('approve dialog names the undo plan', /undo plan/i.test(await page.textContent('#approve-h')));
+    await page.check('#approve-check');
+    await page.click('#approve-go');
+    await sleep(600);
+    check('undo plan approved', (await api('/api/state')).plan.approved);
+    await page.click('#plan-run');
+    await page.waitForSelector('#run-dlg[open]');
+    await page.click('#run-go');
+    await waitIdle();
+    await sleep(1200);
+    check('undo put the file back at its original path', fs.existsSync(src), src);
+    check('undo removed the organized copy', !fs.existsSync(dest), dest);
+    check('undo report written', fs.existsSync(path.join(root, 'Samples', 'Catalog', 'Undo_Report.csv')));
+    check('app asks for a rescan', (await api('/api/state')).undo.rescan_needed === true);
+    if (!(await page.isVisible('#undo-rescan'))) { await page.click('.rail-btn[data-view="log"]'); await sleep(600); }
+    check('Move Log shows the rescan banner', await page.isVisible('#undo-rescan'));
+    check('run marked undone', /Undone/.test(await page.textContent('#undo-state')));
+    await shot('flow-08-undo-log');
     // <<< undo checks
     //
     //
