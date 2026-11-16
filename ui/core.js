@@ -52,7 +52,7 @@ const CAT_SLUGS = ['drums', 'bass', 'synth', 'vocals', 'fx', 'keys'];
 function catSlug(c) { return CAT_SLUG[c] || 'fx'; }
 
 const STATUS_LABEL = { ok: 'OK', 'needs-review': 'Review', edited: 'Edited', held: 'Held', excluded: 'Excluded', done: 'Organized' };
-const ACTION_LABEL = { move: 'Move', link: 'Link', keep: 'Keep', hold: 'Hold', exclude: 'Exclude' };
+const ACTION_LABEL = { move: 'Move', link: 'Link', keep: 'Keep', hold: 'Hold', exclude: 'Exclude', unlink: 'Unlink' };
 const SOURCE_LABEL = { tag: 'Tag', filename: 'Filename', folder: 'Folder', inference: 'Inferred', analysis: 'Analysis', manual: 'Manual' };
 
 /* ---------------- Store (tiny localStorage wrapper) ---------------- */
@@ -109,6 +109,7 @@ const API = {
   },
   get(path, params) { return this.request('GET', path + this.qs(params)); },
   post(path, body) { return this.request('POST', path, body); },
+  del(path) { return this.request('DELETE', path); },
   audioUrl(id) { return '/api/audio/' + encodeURIComponent(id); },
 };
 
@@ -155,6 +156,10 @@ const App = {
   facets: null,
   view: 'library',
   listeners: {},
+  views: {},          // name -> {obj, title}; obj.show() is called when routed
+  features: [],       // feature modules: {init(), afterInit?()}; push at script load time
+  keyHandlers: [],    // (ev) => true when handled; run for keys outside text fields, after Alt+N
+  registerView(name, obj, title) { this.views[name] = { obj, title }; },
   on(ev, fn) { (this.listeners[ev] = this.listeners[ev] || []).push(fn); },
   emit(ev, data) { (this.listeners[ev] || []).forEach((fn) => { try { fn(data); } catch (e) { console.error(e); } }); },
   async refreshState() {
@@ -177,13 +182,13 @@ const App = {
 };
 
 /* ---------------- Waveforms ----------------
-   Wave decodes a sample once (fetch /api/audio/<id> + decodeAudioData), keeps
-   normalized peaks keyed by sample id, and paints them into canvases:
-     - every canvas.wave-canvas[data-wave-for="<id>"] (e.g. the inspector) via paintAll()
-     - the player's scrubber canvases via Player.paintWave()
+   Peaks decodes a sample once (fetch /api/audio/<id> + decodeAudioData), keeps
+   normalized peaks keyed by sample id, and paints them into every
+   canvas.wave-canvas[data-wave-for="<id>"] (e.g. the inspector) via paintAll().
+   The deck's own waveform is media.js's Wave (server peaks, click/drag seek).
    Files over 40 MB, formats the browser can't decode, and fixture mode get no
    peaks; their canvases are left blank and get data-wave-state="none". */
-const Wave = {
+const Peaks = {
   MAX_BYTES: 40 * 1024 * 1024,
   BUCKETS: 600,
   CACHE: 48,
@@ -225,7 +230,7 @@ const Wave = {
       } else this.failed.add(id);
       this.busy = false; this.inflight.delete(id);
       resolve(pk);
-      try { this.paintAll(); if (Player.row && Player.row.id === id) Player.paintWave(); } catch (e) { console.warn(e); }
+      try { this.paintAll(); } catch (e) { console.warn(e); }
       this.pump();
     });
   },
@@ -302,7 +307,7 @@ const Wave = {
   },
   /* Paint every canvas.wave-canvas[data-wave-for] whose sample has peaks cached.
      Others are left untouched (no fetch here: only the player, or an explicit
-     Wave.request(id, size), decodes, so non-audio rows never hit /api/audio). */
+     Peaks.request(id, size), decodes, so non-audio rows never hit /api/audio). */
   paintAll() {
     $$('canvas.wave-canvas[data-wave-for]').forEach((cv) => {
       const id = cv.dataset.waveFor, pk = this.get(id);
@@ -311,7 +316,7 @@ const Wave = {
     });
   },
 };
-window.Wave = Wave;
+window.Peaks = Peaks;
 
 /* ---------------- Spectrum ----------------
    An AnalyserNode on the <audio> element, created lazily on first play inside
@@ -352,7 +357,7 @@ const Spectrum = {
     return out;
   },
   draw(cv, live) {
-    const { w, h, dpr } = Wave.fit(cv);
+    const { w, h, dpr } = Peaks.fit(cv);
     const ctx = cv.getContext('2d');
     if (!ctx || !cv.clientWidth) return;
     ctx.clearRect(0, 0, w, h);
@@ -392,14 +397,14 @@ const Player = {
     this.loopBtn = $('#tp-loop');
     this.auto = $('#tp-auto');
     this.tp = $('#transport');
-    this.waveBox = $('#tp-wave-box');
-    this.waveBase = $('#tp-wave');
-    this.waveLit = $('#tp-wave-lit');
     this.spec = $('#tp-spec');
+    this.oneShotBtn = $('#tp-oneshot');
     const vol = Store.get('volume', 80);
     this.vol.value = vol; this.audio.volume = vol / 100; this.renderVol();
     this.setLoop(Store.get('loop', false));
     this.auto.checked = Store.get('auto', false);
+    this.setOneShot(Store.get('oneshot', false));
+    if (this.oneShotBtn) this.oneShotBtn.addEventListener('click', () => this.setOneShot(!this.oneShot));
     this.vol.addEventListener('input', () => { this.audio.volume = this.vol.value / 100; Store.set('volume', +this.vol.value); this.renderVol(); });
     this.btn.addEventListener('click', () => this.toggle());
     this.loopBtn.addEventListener('click', () => this.setLoop(!this.audio.loop));
@@ -411,14 +416,20 @@ const Player = {
     });
     this.scrub.addEventListener('change', () => { this.scrubbing = false; });
     this.audio.addEventListener('timeupdate', () => this.renderTime());
-    this.audio.addEventListener('loadedmetadata', () => { this.scrub.disabled = false; this.renderTime(); });
+    this.audio.addEventListener('loadedmetadata', () => {
+      this.scrub.disabled = false;
+      if (this.pendingSeek !== null && isFinite(this.audio.duration)) { this.audio.currentTime = this.pendingSeek * this.audio.duration; this.pendingSeek = null; }
+      this.renderTime();
+    });
     this.audio.addEventListener('play', () => { Spectrum.resume(); this.renderState(); });
     this.audio.addEventListener('pause', () => this.renderState());
     this.audio.addEventListener('ended', () => this.renderState());
     this.audio.addEventListener('error', () => {
       if (!this.row || !this.audio.getAttribute('src')) return;
-      this.msg(`Could not play ${this.row.name}. The file may have moved or uses an encoding this browser can't decode.`, 'err');
+      const row = this.row;
+      this.msg(`Could not play ${row.name}. The file may have moved or uses an encoding this browser can't decode.`, 'err', this.revealAction(row));
       this.renderState();
+      if (Player.CONVERTED.includes(row.ext)) this.explainConvertError(row);
     });
     this.renderSub();
     this.setPlayhead(0);
@@ -429,8 +440,7 @@ const Player = {
     new MutationObserver(() => this.repaint()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-accent'] });
   },
   repaint() {
-    this.paintWave();
-    Wave.paintAll();
+    Peaks.paintAll();
     if (this.audio.paused) Spectrum.draw(this.spec, false);
   },
   setLoop(on) {
@@ -438,13 +448,54 @@ const Player = {
     this.loopBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
     Store.set('loop', !!on);
   },
-  autoOn() { return this.auto.checked; },
+  CONVERTED: ['.aif', '.aiff', '.aifc'],  // served as WAV converted on the fly by the server
+  pendingSeek: null,
+  oneShot: false,
+  /* Retrigger mode: every arrow-key move stops the current sound and restarts
+     the newly selected row from 0 (also when the row did not change). */
+  setOneShot(on) {
+    this.oneShot = !!on;
+    if (this.oneShotBtn) this.oneShotBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    Store.set('oneshot', !!on);
+  },
+  toggleOneShot() { this.setOneShot(!this.oneShot); toast('Retrigger on arrows ' + (this.oneShot ? 'on' : 'off')); },
+  autoOn() { return this.auto.checked || this.oneShot; },
+  revealAction(row) { return row && row.id ? { label: 'Show in Explorer', fn: () => reveal({ id: row.id }) } : null; },
+  async explainConvertError(row) {
+    try {
+      const r = await fetch(API.audioUrl(row.id), { headers: { Range: 'bytes=0-0' }, cache: 'no-store' });
+      if (r.ok || !this.row || this.row.id !== row.id) return;
+      const j = await r.json().catch(() => null);
+      if (j && j.error) this.msg(`Can't preview ${row.name}: ${j.error}`, 'warn', this.revealAction(row));
+    } catch (e) { /* keep the generic message */ }
+  },
+  /* Seek to a fraction 0..1 of the loaded sample; starts playback if nothing is loaded yet. */
+  seekFrac(f) {
+    f = Math.max(0, Math.min(1, f));
+    const a = this.audio;
+    if (!this.row) return;
+    if (a.getAttribute('src') && a.duration && isFinite(a.duration)) {
+      a.currentTime = f * a.duration;
+      this.renderTime();
+      if (a.paused) this.play(null, false);
+      return;
+    }
+    if (!this.playable(this.row)) { this.renderState(); return; }
+    this.pendingSeek = f;
+    this.play(null, false);
+  },
   toggleAuto() { this.auto.checked = !this.auto.checked; Store.set('auto', this.auto.checked); toast('Auto-play on arrows ' + (this.auto.checked ? 'on' : 'off')); },
-  msg(text, kind) {
+  msg(text, kind, action) {
     const m = $('#tp-msg');
     m.textContent = text || '';
     m.title = text || '';
-    m.className = 'tp-msg' + (kind ? ' tp-msg-' + kind : '');
+    m.className = 'tp-msg' + (kind ? ' tp-msg-' + kind : '') + (action ? ' has-act' : '');
+    if (text && action) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'tp-msg-act'; b.textContent = action.label;
+      b.addEventListener('click', action.fn);
+      m.append(' ', b);
+    }
   },
   renderVol() { this.vol.style.setProperty('--v', this.vol.value + '%'); },
   renderSub() {
@@ -454,34 +505,30 @@ const Player = {
   decodable(row) {
     return !!row && (!row.kind || row.kind === 'audio') && row.preview !== 'unsupported' && row.preview !== 'none' && !API.fixture;
   },
-  /* Draw the loaded sample's peaks behind the scrubber: a dim layer and a lit
-     layer that CSS clips to --playhead. Without peaks the gradient pill track shows. */
-  paintWave() {
-    const pk = this.row ? Wave.get(this.row.id) : null;
-    this.waveBox.classList.toggle('has-wave', !!pk);
-    if (!pk) return;
-    Wave.draw(this.waveBase, pk, 'rgba(246, 239, 255, .26)');
-    Wave.draw(this.waveLit, pk);
-  },
   load(row) {
     this.row = row;
     $('#tp-name').textContent = row ? row.name : 'Nothing loaded';
     $('#tp-name').title = row ? row.abs_path || row.name : '';
     $('#tp-dur').textContent = Fmt.dur(row && row.duration_s);
     this.msg('');
+    this.pendingSeek = null;
     this.audio.pause();
     this.audio.removeAttribute('src');
     this.scrub.value = 0; this.scrub.disabled = true;
     this.setPlayhead(0);
     this.renderSub();
-    this.paintWave();
-    if (this.decodable(row)) Wave.request(row.id, row.size);
+    if (this.decodable(row)) Peaks.request(row.id, row.size);
     App.emit('player', row);
   },
   playable(row) {
     if (!row) return false;
     if (row.kind && row.kind !== 'audio') { this.msg(`${row.name} is not audio (${row.ext || row.kind}).`, 'info'); return false; }
-    if (row.preview === 'unsupported') { this.msg(`Preview not supported in browser for ${row.ext}. Open it in your DAW or reveal it in Explorer.`, 'warn'); return false; }
+    if (row.preview === 'unsupported') {
+      const rex = ['.rex', '.rx2'].includes((row.ext || '').toLowerCase());
+      this.msg(rex ? `Preview not supported in browser for ${row.ext}. REX/RX2 loops play in your DAW.`
+        : `Preview not supported in browser for ${row.ext}. Open it in your DAW.`, 'warn', this.revealAction(row));
+      return false;
+    }
     if (row.preview === 'none') { this.msg(`No preview for ${row.ext}.`, 'info'); return false; }
     if (API.fixture) { this.msg('Audio unavailable in fixture mode. The player works with your real library.', 'info'); return false; }
     return true;
@@ -491,7 +538,8 @@ const Player = {
     row = this.row;
     if (!this.playable(row)) { this.renderState(); return; }
     if (!this.audio.getAttribute('src')) this.audio.src = API.audioUrl(row.id);
-    if (fromStart) this.audio.currentTime = 0;
+    if (fromStart && this.oneShot && !this.audio.paused) this.audio.pause();  // retrigger: cut the tail now
+    if (fromStart) { this.pendingSeek = null; this.audio.currentTime = 0; }
     // Build the analyser inside the user gesture so its AudioContext can start.
     Spectrum.ensure(this.audio); Spectrum.resume();
     const p = this.audio.play();

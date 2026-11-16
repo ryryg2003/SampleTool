@@ -4,7 +4,17 @@
 
 const CATEGORY_LIST = ['One-Shots/Drums', 'One-Shots/Bass & 808s', 'One-Shots/Instruments', 'One-Shots/FX & Vocals',
   'Loops/Drum Loops', 'Loops/Melody Loops', 'Loops/Bass Loops', 'Loops/Vocal & FX Loops', 'Presets & MIDI', 'Unsorted'];
-const FILTER_LABEL = { category: 'Category', instrument: 'Instrument', loop_type: 'Type', key: 'Key', genre: 'Genre', manufacturer: 'Maker', bpm_min: 'BPM ≥', bpm_max: 'BPM ≤', status: 'Status', pack: 'Pack', q: 'Search' };
+const FILTER_LABEL = { category: 'Category', instrument: 'Instrument', loop_type: 'Type', key: 'Key', genre: 'Genre', manufacturer: 'Maker', bpm_min: 'BPM ≥', bpm_max: 'BPM ≤', status: 'Status', pack: 'Pack', q: 'Search', coll: 'Collection', new: 'New' };
+const FILTER_KEYS = ['category', 'instrument', 'loop_type', 'key', 'genre', 'manufacturer', 'bpm_min', 'bpm_max', 'status'];
+const NO_HASH_TIP = 'Can’t star or collect: this file could not be fingerprinted (SHA-256 failed)';
+function starTip(r) {
+  if (!r.sha256) return NO_HASH_TIP;
+  const base = r.starred ? 'Unstar (S)' : 'Star (S)';
+  return r.dup_count > 1 ? `${base}. ${r.dup_count} identical copies share this star: favorites follow the content, not the path` : base;
+}
+function starBtn(r, extra) {
+  return `<button type="button" class="ib star${r.starred ? ' on' : ''}${extra || ''}" data-act="star" aria-pressed="${r.starred ? 'true' : 'false'}" aria-label="${r.starred ? 'Unstar' : 'Star'} ${esc(r.name)}" title="${esc(starTip(r))}" tabindex="-1"${r.sha256 ? '' : ' disabled'}><svg><use href="#i-star"/></svg></button>`;
+}
 
 function provBadge(p) {
   if (!p || !p.source) return '<span class="prov prov-none" title="Unknown: no evidence found">unknown</span>';
@@ -12,6 +22,10 @@ function provBadge(p) {
   const lvl = c === null || c === undefined ? 'sure' : c >= 0.8 ? 'hi' : c >= 0.55 ? 'mid' : 'lo';
   const title = `${SOURCE_LABEL[p.source] || p.source}${c !== null && c !== undefined ? ', ' + Fmt.pct(c) + ' confidence' : ''}`;
   return `<span class="prov prov-${esc(p.source)} conf-${lvl}" title="${esc(title)}">${esc(SOURCE_LABEL[p.source] || p.source)}${c !== null && c !== undefined ? `<b class="mono">${Fmt.pct(c)}</b>` : ''}</span>`;
+}
+function estMark(r, k, text) {
+  const est = text !== '' && r.prov && r.prov[k] && r.prov[k].source === 'analysis';
+  return est ? `<span class="est" title="Measured from the audio (estimate)">${esc(text)}</span>` : esc(text);
 }
 function statusBadge(s) { return s ? `<span class="st st-${esc(s)}">${esc(STATUS_LABEL[s] || s)}</span>` : ''; }
 function extBadge(row) { return `<span class="ext${row.preview === 'unsupported' ? ' ext-np' : ''}" title="${row.preview === 'unsupported' ? 'Browser cannot preview this format' : esc(row.ext)}">${esc((row.ext || '').replace('.', ''))}</span>`; }
@@ -47,6 +61,8 @@ const Library = {
   filters: {},
   q: '',
   pack: null,
+  coll: null,          // {id: 'fav'|<collection id>, name} membership filter
+  newOnly: false,      // "New since last run"
   tab: 'sounds',
   sel: new Map(),      // id -> row
   anchor: -1,
@@ -62,11 +78,13 @@ const Library = {
         { key: 'name', label: 'Name', sort: 'name', width: 'minmax(110px, 1.7fr)', cls: 'c-name', title: (r) => r.abs_path, render: (r) => `<span class="nm-line"><span class="nm ellip">${esc(r.name)}</span></span><span class="nm-sub">${extBadge(r)}${r.kit_name ? `<span class="kitmark" title="Part of kit ${esc(r.kit_name)}">kit</span>` : ''}${r.dup_count > 1 ? `<span class="dupmark mono" title="${r.dup_count} identical copies">×${r.dup_count}</span>` : ''}</span>` },
         { key: 'pack', label: 'Pack', sort: 'pack', width: 'minmax(56px, .8fr)', cls: 'c-pack', title: (r) => r.pack || '', render: (r) => `<span class="ellip">${esc(r.pack ? shortPack(r.pack, r.manufacturer) : (r.origin === 'library' ? 'In library' : '—'))}</span>` },
         { key: 'inst', label: 'Instrument', width: 'minmax(84px, .95fr)', cls: 'c-inst', title: (r) => r.category || '', render: (r) => catTag(r.category, r.instrument || Fmt.catShort(r.category) || '—') },
-        { key: 'bpm', label: 'BPM', sort: 'bpm', width: '38px', cls: 'num', render: (r) => esc(Fmt.bpm(r.bpm)) },
-        { key: 'key', label: 'Key', sort: 'key', width: '38px', cls: 'c-key', render: (r) => esc(r.key || '') },
+        { key: 'bpm', label: 'BPM', sort: 'bpm', width: '44px', cls: 'num', render: (r) => estMark(r, 'bpm', Fmt.bpm(r.bpm)) },
+        { key: 'key', label: 'Key', sort: 'key', width: '42px', cls: 'c-key', render: (r) => estMark(r, 'key', r.key || '') },
+        { key: 'bars', label: 'Bars', width: '38px', cls: 'num', render: (r) => r.bars ? `${esc(r.bars)}${r.on_grid === false ? '<span class="offgrid" title="Starts late: not on the downbeat">◂</span>' : ''}` : '' },
         { key: 'dur', label: 'Length', sort: 'duration', width: '50px', cls: 'num', render: (r) => r.duration_s ? Fmt.dur(r.duration_s) : '' },
         { key: 'size', label: 'Size', sort: 'size', width: '54px', cls: 'num', render: (r) => Fmt.bytes(r.size) },
         { key: 'st', label: 'Status', sort: 'status', width: '70px', cls: 'c-st', render: (r) => statusBadge(r.review_status) },
+        { key: 'star', label: '', sr: 'Starred', width: '26px', cls: 'c-star', render: (r) => starBtn(r) },
         { key: 'act', label: '', sr: 'Actions', width: '66px', cls: 'c-act', render: () => `<button type="button" class="ib" data-act="copy" aria-label="Copy path" title="Copy path" tabindex="-1"><svg><use href="#i-copy"/></svg></button><button type="button" class="ib" data-act="reveal" aria-label="Show in Explorer" title="Show in Explorer" tabindex="-1"><svg><use href="#i-folder"/></svg></button><button type="button" class="ib" data-act="edit" aria-label="Edit" title="Edit (E)" tabindex="-1"><svg><use href="#i-edit"/></svg></button>` },
       ],
       fetch: (offset, limit) => API.get('/api/samples', Object.assign(this.params(), { sort: this.table.sort, dir: this.table.dir, offset, limit })),
@@ -78,6 +96,7 @@ const Library = {
       onRowDblClick: (i, r) => Player.play(r, true),
       onAction: (act, r, i, ev) => {
         if (act === 'play') this.playRow(i, r, ev);
+        else if (act === 'star') { if ((typeof Collections !== 'undefined')) Collections.star([r]); }
         else if (act === 'copy') copyText(r.abs_path);
         else if (act === 'reveal') reveal({ id: r.id });
         else if (act === 'edit') { if (!this.sel.has(r.id)) this.selectOnly(i, r); this.openBulk(); }
@@ -121,6 +140,10 @@ const Library = {
     $('#sel-edit').addEventListener('click', () => this.openBulk());
     $('#sel-kit').addEventListener('click', () => this.openKitNew());
     $('#sel-clear').addEventListener('click', () => this.clearSelection());
+    $('#sel-star').addEventListener('click', () => Collections.star([...this.sel.values()]));
+    $('#sel-coll').addEventListener('click', () => Collections.openAdd([...this.sel.values()]));
+    $('#lib-new').addEventListener('click', () => this.setNewOnly(!this.newOnly));
+    $('#lib-save-smart').addEventListener('click', () => Collections.openSaveSmart(this.params()));
     $('#bulk-go').addEventListener('click', () => this.applyBulk());
     $('#kitnew-go').addEventListener('click', () => this.createKit());
     $('#kitnew-name').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); this.createKit(); } });
@@ -145,9 +168,34 @@ const Library = {
     if (this.q) p.q = this.q;
     if (!this.allFiles) p.kind = DEFAULT_KINDS;
     if (this.pack) { p.pack = this.pack; p.kit = 'none'; }
+    if (this.coll) { if (this.coll.id === 'fav') p.fav = '1'; else p.collection = this.coll.id; }
+    if (this.newOnly) p.new = '1';
     return p;
   },
-  activeCount() { return Object.keys(this.filters).length + (this.q ? 1 : 0) + (this.pack ? 1 : 0); },
+  activeCount() { return Object.keys(this.filters).length + (this.q ? 1 : 0) + (this.pack ? 1 : 0) + (this.coll ? 1 : 0) + (this.newOnly ? 1 : 0); },
+  setColl(c) { this.coll = c || null; this.apply(); },
+  /* Open a collection from the sidebar: show the whole collection (other filters reset). */
+  openColl(c) {
+    this.filters = {}; this.q = ''; $('#lib-q').value = '';
+    $$('#lib-filters [data-f]').forEach((el) => { el.value = ''; });
+    this.newOnly = false; this.coll = c || null;
+    if (this.pack) { this.setPack(null); return; }
+    this.apply();
+  },
+  setNewOnly(on) { this.newOnly = !!on; this.apply(); },
+  /* Restore a saved search (smart collection). Replaces every current filter. */
+  restoreParams(p) {
+    p = p || {};
+    this.filters = {};
+    for (const k of FILTER_KEYS) if (p[k]) this.filters[k] = String(p[k]);
+    $$('#lib-filters [data-f]').forEach((el) => { el.value = this.filters[el.dataset.f] || ''; });
+    this.q = p.q || ''; $('#lib-q').value = this.q;
+    this.allFiles = !p.kind; $('#lib-allfiles').checked = this.allFiles; Store.set('lib.allFiles', this.allFiles);
+    this.newOnly = p.new === '1' || p.new === 'true';
+    this.coll = p.fav ? { id: 'fav', name: 'Favorites' } : p.collection ? { id: p.collection, name: ((typeof Collections !== 'undefined') && Collections.name(p.collection)) || 'Collection' } : null;
+    if ((p.pack || null) !== this.pack) { this.setPack(p.pack || null); return; }
+    this.apply();
+  },
 
   apply() {
     this.renderChips();
@@ -194,16 +242,23 @@ const Library = {
   renderChips() {
     const chips = [];
     if (this.pack) chips.push(['pack', this.pack]);
+    if (this.coll) chips.push(['coll', this.coll.name]);
+    if (this.newOnly) chips.push(['new', 'since last run']);
     if (this.q) chips.push(['q', '“' + this.q + '”']);
     for (const [k, v] of Object.entries(this.filters)) chips.push([k, k === 'category' ? Fmt.catShort(v) : k === 'status' ? STATUS_LABEL[v] || v : v]);
     $('#lib-chips').innerHTML = chips.map(([k, v]) => `<span class="chip"><span class="chip-k">${esc(FILTER_LABEL[k] || k)}</span> <span class="chip-v ellip">${esc(v)}</span><button type="button" class="chip-x" data-k="${k}" aria-label="Remove filter ${esc(FILTER_LABEL[k] || k)} ${esc(v)}"><svg><use href="#i-x"/></svg></button></span>`).join('');
     $$('#lib-chips .chip-x').forEach((b) => b.addEventListener('click', () => {
       const k = b.dataset.k;
       if (k === 'pack') this.setPack(null);
+      else if (k === 'coll') this.setColl(null);
+      else if (k === 'new') this.setNewOnly(false);
       else if (k === 'q') { this.q = ''; $('#lib-q').value = ''; this.apply(); }
       else { delete this.filters[k]; const el = $(`#lib-filters [data-f="${k}"]`); if (el) el.value = ''; this.apply(); }
     }));
     $('#lib-clear').hidden = chips.length === 0;
+    $('#lib-save-smart').hidden = chips.length === 0;
+    const nb = $('#lib-new'); nb.setAttribute('aria-pressed', this.newOnly ? 'true' : 'false'); nb.classList.toggle('is-set', this.newOnly);
+    App.emit('lib-filters', this.params());
     $$('#lib-filters [data-f]').forEach((el) => el.classList.toggle('is-set', !!this.filters[el.dataset.f]));
     this.renderStats();
   },
@@ -211,7 +266,7 @@ const Library = {
   clearAll() {
     this.filters = {}; this.q = ''; $('#lib-q').value = '';
     $$('#lib-filters [data-f]').forEach((el) => { el.value = ''; });
-    this.pack = null; this.tab = 'sounds';
+    this.pack = null; this.tab = 'sounds'; this.coll = null; this.newOnly = false;
     this.renderPackHead(); this.markPacks();
     this.apply();
   },
@@ -393,13 +448,45 @@ const Library = {
   async inspect(row) {
     this.current = row;
     this.detail = null;
+    this.matches = null;
+    this.matchErr = null;
     this.renderInspector();
+    this.loadMatches(row.id);
     try {
       const d = await API.get('/api/samples/' + encodeURIComponent(row.id));
       if (this.current && this.current.id === row.id) { this.detail = d; this.renderInspector(); }
     } catch (e) {
       if (this.current && this.current.id === row.id) { this.detailErr = e.message; this.renderInspector(); }
     }
+  },
+  async loadMatches(id) {
+    if (!this.current || this.current.kind !== 'audio') return;
+    try {
+      const r = await API.get('/api/samples/' + encodeURIComponent(id) + '/matches', { role: this.matchRole || '', limit: 25 });
+      if (this.current && this.current.id === id) { this.matches = r.items; this.renderInspector(); }
+    } catch (e) {
+      if (this.current && this.current.id === id) { this.matches = []; this.matchErr = e.message; this.renderInspector(); }
+    }
+  },
+  matchesHtml(d) {
+    if (d.kind !== 'audio') return '';
+    const role = this.matchRole || '';
+    const roles = [['', 'All'], ['drums', 'Drums'], ['bass', 'Bass'], ['melody', 'Melody'], ['vocal-fx', 'Vocal & FX']];
+    const chips = roles.map(([v, l]) => `<button type="button" class="mchip${role === v ? ' on' : ''}" data-role="${v}" aria-pressed="${role === v}">${l}</button>`).join('');
+    let body;
+    if (this.matches === null) body = '<p class="dim small">Finding matches…</p>';
+    else if (!this.matches.length) body = `<p class="dim small">${esc(this.matchErr || 'No good matches yet. A sample needs a category, plus a tempo or key, to be matched.')}</p>`;
+    else body = `<ol class="mlist">${this.matches.map((m, i) => `<li class="mrow">
+        <button type="button" class="ib mplay" data-i="${i}" aria-label="Play ${esc(m.row.name)}"><svg><use href="#i-${Player.isPlaying(m.row.id) ? 'stop' : 'play'}"/></svg></button>
+        <button type="button" class="mname" data-i="${i}" title="Open ${esc(m.row.name)}"><span class="ellip">${esc(m.row.name)}</span><span class="dim mono small ellip">${esc([Fmt.catShort(m.row.category), m.row.bpm && Fmt.bpm(m.row.bpm) + ' BPM', m.row.key].filter(Boolean).join(' · '))}</span></button>
+        <span class="mscore" title="Match ${Math.round(m.score * 100)}%"><i style="width:${Math.round(m.score * 100)}%"></i></span>
+        <span class="mwhy">${esc(m.reasons.join(' · '))}</span></li>`).join('')}</ol>`;
+    return `<section class="matches" aria-label="Goes well with"><h3 class="side-h">Goes well with</h3><div class="mchips" role="group" aria-label="Filter matches by role">${chips}</div>${body}</section>`;
+  },
+  bindMatches() {
+    $$('#inspector .mchip').forEach((b) => { b.onclick = () => { this.matchRole = b.dataset.role; this.matches = null; this.renderInspector(); this.loadMatches(this.current.id); }; });
+    $$('#inspector .mplay').forEach((b) => { b.onclick = () => { Player.toggle(this.matches[+b.dataset.i].row); this.renderInspector(); }; });
+    $$('#inspector .mname').forEach((b) => { b.onclick = () => this.inspect(this.matches[+b.dataset.i].row); });
   },
   renderInspector() {
     const box = $('#inspector');
@@ -413,11 +500,17 @@ const Library = {
         <div class="ins-actions col">
           <button class="btn btn-primary" type="button" id="ins-bulk">Bulk edit ${Fmt.num(rows.length)} samples…</button>
           <button class="btn" type="button" id="ins-kit">Create kit from selection…</button>
+          <button class="btn" type="button" id="ins-mstar"><svg><use href="#i-star"/></svg>Star / unstar all</button>
+          <button class="btn" type="button" id="ins-mcoll">Add to collection…</button>
+          ${this.coll && this.coll.id !== 'fav' ? `<button class="btn" type="button" id="ins-mremove">Remove from “${esc(this.coll.name)}”</button>` : ''}
           <button class="btn btn-ghost" type="button" id="ins-clear">Clear selection</button>
         </div>
         <p class="hint">Ctrl+click adds or removes one sample. Shift+click or Shift+↓ extends the range.</p></div>`;
       $('#ins-bulk').onclick = () => this.openBulk();
       $('#ins-kit').onclick = () => this.openKitNew();
+      $('#ins-mstar').onclick = () => Collections.star(rows);
+      $('#ins-mcoll').onclick = () => Collections.openAdd(rows);
+      if ($('#ins-mremove')) $('#ins-mremove').onclick = () => Collections.removeFrom(this.coll.id, rows);
       $('#ins-clear').onclick = () => this.clearSelection();
       return;
     }
@@ -457,6 +550,8 @@ const Library = {
         <div class="ins-actions">
           <button class="btn btn-primary ins-play${playing ? ' is-playing' : ''}" type="button" id="ins-play"><svg><use href="#i-${playing ? 'stop' : 'play'}"/></svg>${playing ? 'Stop' : 'Play'}</button>
           <button class="btn" type="button" id="ins-edit"><svg><use href="#i-edit"/></svg>Edit</button>
+          ${starBtn(d, ' ins-star').replace('tabindex="-1"', 'id="ins-star"')}
+          <button class="ib ins-collb" type="button" id="ins-coll" aria-label="Add to collection" ${d.sha256 ? 'title="Add to collection…"' : `disabled title="${esc(NO_HASH_TIP)}"`}><svg viewBox="0 0 24 24"><path d="M4 7h11M4 12h11M4 17h7M18 14v6M15 17h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
           <button class="ib" type="button" id="ins-copy" aria-label="Copy original path" title="Copy original path"><svg><use href="#i-copy"/></svg></button>
           <button class="ib" type="button" id="ins-reveal" aria-label="Show in Explorer" title="Show in Explorer"><svg><use href="#i-folder"/></svg></button>
         </div>
@@ -465,6 +560,7 @@ const Library = {
           ${box2('bpm', 'BPM', Fmt.bpm, 'mono-v')}
           ${box2('key', 'Key', null, 'mono-v')}
           ${plain('Length', esc(durS ? Fmt.dur(durS) : '—'), 'mono-v')}
+          ${d.bars ? `<div class="mbox mono-v mbox-bars"><span class="mbox-h"><span class="mbox-l">Bars</span><span class="prov prov-analysis">Analysis</span></span><span class="mbox-v">${esc(d.bars)}${d.on_grid === false ? `<small class="mbox-s">starts ${esc(Math.round(d.downbeat_ms || 0))} ms late</small>` : d.on_grid ? '<small class="mbox-s">on the downbeat</small>' : ''}</span></div>` : ''}
           ${plain('Format', `${esc(fmtName)}${fmtSub ? `<small class="mbox-s mono">${esc(fmtSub)}</small>` : ''}`)}
           ${plain('Size', esc(Fmt.bytes(d.size)))}
           ${plain('Status', statusBadge(d.review_status) || '<span class="unk">—</span>')}
@@ -487,13 +583,19 @@ const Library = {
         ${d.dup_count > 1 ? `<p class="note">${d.dup_count} identical copies of this file exist. The plan keeps one physical copy.</p>` : ''}
         ${(d.warnings || []).length ? `<ul class="warns">${d.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
         ${this.detail && this.detail.tags_raw && Object.keys(this.detail.tags_raw).length ? `<details class="raw"><summary>Embedded tags</summary><pre class="mono">${esc(JSON.stringify(this.detail.tags_raw, null, 1))}</pre></details>` : ''}
+        ${this.matchesHtml(d)}
+        ${(typeof Collections !== 'undefined') ? Collections.inspectorHtml(d) : ''}
         <p class="dim small mono">sha256 ${esc(Fmt.hash8(d.sha256))}…</p>
       </div>`;
+    this.bindMatches();
     $('#ins-play').onclick = () => { Player.toggle(d); this.syncInsPlay(); };
     $('#ins-edit').onclick = () => this.openBulk();
     $('#ins-copy').onclick = () => copyText(d.abs_path);
     $('#ins-reveal').onclick = () => reveal({ id: d.id });
-    if (window.Wave) Wave.paintAll();
+    $('#ins-star').onclick = () => Collections.star([d]);
+    $('#ins-coll').onclick = () => Collections.openAdd([d]);
+    $$('#inspector [data-coll-rm]').forEach((b) => { b.onclick = () => Collections.removeFrom(b.dataset.collRm, [d]); });
+    if (window.Peaks) Peaks.paintAll();
     this.detailErr = null;
   },
   /* Keep the inspector's Play/Stop button in step with the player without re-rendering

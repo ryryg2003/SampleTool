@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import functools
 import re
-from collections import Counter, defaultdict
+from collections import defaultdict
 
-from . import audio_meta
+from . import analysis, audio_meta
 from .models import CATEGORIES, META_KEYS, field
 
 # ------------------------------------------------------------------ text utils
@@ -455,10 +455,18 @@ def classify_item(item: dict) -> dict:
             lt = field("one-shot", "inference", 0.4)
         elif dur >= 4.0 and _filename_has_bpm(stem):
             lt = field("loop", "inference", 0.45)
+    an = item.get("analysis") or {}
+    if lt is None and an.get("bars"):
+        lt = field("loop", "analysis", 0.6)
     if lt is not None:
         meta["loop_type"] = lt
 
     _fill_bpm_key(meta, tags, acid, stem, folders, meta["loop_type"]["value"])
+    # measured audio is the last evidence source
+    if meta["bpm"]["value"] is None and an.get("bpm"):
+        meta["bpm"] = field(an["bpm"], "analysis", an.get("bpm_conf"))
+    if meta["key"]["value"] is None and an.get("key"):
+        meta["key"] = field(an["key"], "analysis", an.get("key_conf"))
 
     # BPM evidence implies loop when still unknown (weak)
     if meta["loop_type"]["value"] is None and meta["bpm"]["value"] is not None:
@@ -654,6 +662,93 @@ def _prog(progress, **kw):
             pass
 
 
+def _reclassify(it: dict) -> None:
+    old = it.get("meta") or {}
+    meta = classify_item(it)
+    for k in META_KEYS:  # never clobber manual edits
+        if isinstance(old.get(k), dict) and old[k].get("source") == "manual":
+            meta[k] = old[k]
+    it["meta"] = meta
+
+
+def _analysis_want(it: dict):
+    """Which measurements an item needs, or None to skip it."""
+    if it.get("kind") != "audio" or (it.get("ext") or "").lower() not in analysis.DECODABLE:
+        return None
+    meta = it.get("meta") or {}
+    lt = (meta.get("loop_type") or {}).get("value")
+    cat = (meta.get("category") or {}).get("value") or ""
+    if lt == "one-shot":
+        if cat in ("One-Shots/Bass & 808s", "One-Shots/Instruments"):
+            return frozenset({"root"})
+        return None
+    if cat == "Loops/Drum Loops":
+        return frozenset({"tempo"})
+    return frozenset({"tempo", "key"})
+
+
+_SAYS = {"tag": "Tags say", "filename": "Filename says", "folder": "Folder says",
+         "manual": "Your edit says"}
+
+
+def _mismatch_warnings(it: dict, want) -> list:
+    an, meta, out = it.get("analysis") or {}, it.get("meta") or {}, []
+    b = meta.get("bpm") or {}
+    if an.get("bpm") and b.get("value") and b.get("source") != "analysis":
+        if min(abs(an["bpm"] * m - b["value"]) / b["value"] for m in (0.5, 1, 2)) > 0.03:
+            out.append("%s %g BPM, audio measures %g" % (_SAYS.get(b["source"], "Metadata says"),
+                                                       b["value"], round(an["bpm"])))
+    k = meta.get("key") or {}
+    if an.get("key") and k.get("value") and k.get("source") != "analysis":
+        if "root" in want:
+            a, e = analysis.norm_key(an["key"]), analysis.norm_key(k["value"])
+            bad = bool(e) and a != e.rstrip("m")
+        else:
+            bad = analysis.key_compat(an["key"], k["value"])[0] < 0.9
+        if bad:
+            out.append("%s %s, audio measures %s" % (_SAYS.get(k["source"], "Metadata says"),
+                                                   k["value"], an["key"]))
+    return out
+
+
+def analyze_items(items: list, cache: dict, progress=None, cancel=None,
+                  analyzer=None) -> dict:
+    """Measure tempo/key/bars for decodable audio, re-classify those items.
+
+    cache maps sha256|version|want -> result. Returns the cache restricted to
+    the entries used by this run (stale entries drop out)."""
+    analyzer = analyzer or analysis.analyze
+    todo = [(it, w) for it in items for w in [_analysis_want(it)] if w]
+    used: dict = {}
+    for n, (it, want) in enumerate(todo):
+        if cancel is not None and cancel.is_set():
+            break
+        if n % 10 == 0:
+            _prog(progress, phase="analyzing", done=n, total=len(todo),
+                  current=it.get("rel_path", ""))
+        ck = "%s|%d|%s" % (it.get("sha256"), analysis.ANALYSIS_VERSION, ",".join(sorted(want))) \
+            if it.get("sha256") else None
+        if ck and (ck in used or ck in cache):
+            res, warns = used.get(ck) or cache[ck], []
+        else:
+            try:
+                res, warns = analyzer(it.get("abs_path", ""), it.get("ext", ""), want)
+            except Exception as e:  # analysis must never break a scan
+                res, warns = None, ["audio analysis failed: %s" % e]
+        if ck and res is not None:
+            used[ck] = res
+        if res is None:
+            it["warnings"] = list(it.get("warnings") or []) + \
+                [w for w in warns if w not in (it.get("warnings") or [])]
+            continue
+        it["analysis"] = res
+        _reclassify(it)
+        ws = list(it.get("warnings") or [])
+        it["warnings"] = ws + [w for w in _mismatch_warnings(it, want) if w not in ws]
+    _prog(progress, phase="analyzing", done=len(todo), total=len(todo))
+    return used
+
+
 def enrich(items: list, progress=None, cancel=None) -> None:
     total = len(items)
     audio_items = [it for it in items if it.get("kind") == "audio"]
@@ -680,12 +775,7 @@ def enrich(items: list, progress=None, cancel=None) -> None:
         if n % 200 == 0:
             _prog(progress, phase="classifying", done=n, total=total,
                   current=it.get("rel_path", ""))
-        old = it.get("meta") or {}
-        meta = classify_item(it)
-        for k in META_KEYS:  # never clobber manual edits
-            if isinstance(old.get(k), dict) and old[k].get("source") == "manual":
-                meta[k] = old[k]
-        it["meta"] = meta
+        _reclassify(it)
         it.setdefault("warnings", [])
     find_near_dupes(items)
     _prog(progress, phase="classifying", done=total, total=total)

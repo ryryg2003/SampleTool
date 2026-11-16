@@ -65,6 +65,7 @@
 /* tone per action / status (ruling 9) */
 .card.c-move { --tone: var(--move); }
 .card.c-link { --tone: var(--link); }
+.card.c-unlink { --tone: var(--link); }
 .card.c-keep { --tone: var(--keep); }
 .card.c-hold { --tone: var(--hold); }
 .card.c-exclude { --tone: var(--exclude); }
@@ -76,6 +77,7 @@
 .card.t-unknown { --tone: var(--exclude); }
 .card.t-collide { --tone: var(--cat-drums); }
 .card.t-held { --tone: var(--hold); }
+.card.c-new.has-new { --tone: var(--ok); }
 /* Information-only tiles in the plan (not filters): glass with light text. */
 .card.card-info { color: var(--text); background: var(--raised); border: 1px solid var(--line); box-shadow: none; }
 .card.card-info .card-k, .card.card-info .card-s { color: var(--muted); opacity: 1; }
@@ -119,7 +121,7 @@ button.card:not(:disabled):focus-visible { box-shadow: var(--focus); border-radi
 #scan-summary .sub-h { font-size: 15px; font-weight: 800; margin: 2px 0 10px 4px; }
 .next-step { display: flex; gap: 10px; margin-top: var(--gap); }
 .empty.empty-scan { padding: 20px 24px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-card); }
-@media (min-width: 1680px) { .cards-scan { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+@media (min-width: 1680px) { .cards-scan { grid-template-columns: repeat(8, minmax(0, 1fr)); } .cards-scan:has(.c-new) { grid-template-columns: repeat(9, minmax(0, 1fr)); } }
 
 /* ---------- Review ---------- */
 .head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -231,7 +233,7 @@ button.card:not(:disabled):focus-visible { box-shadow: var(--focus); border-radi
 #op-table .vt-row.grp-start::before { content: ""; position: absolute; left: 12px; right: 12px; top: -3px; height: 1px; background: var(--line); }
 #op-table .vt-td.c-grp { color: var(--text); font-weight: 700; font-size: 12.5px; }
 :is(#op-table, #log-table) .vt-row:is(.row-act-move, .row-rs-already-done) { --edge: var(--move); }
-:is(#op-table, #log-table) .vt-row.row-act-link { --edge: var(--link); }
+:is(#op-table, #log-table) .vt-row:is(.row-act-link, .row-act-unlink) { --edge: var(--link); }
 :is(#op-table, #log-table) .vt-row:is(.row-act-keep, .row-rs-skipped) { --edge: var(--keep); }
 :is(#op-table, #log-table) .vt-row:is(.row-act-hold, .row-rs-held) { --edge: var(--hold); }
 :is(#op-table, #log-table) .vt-row:is(.row-act-exclude, .row-rs-failed) { --edge: var(--exclude); }

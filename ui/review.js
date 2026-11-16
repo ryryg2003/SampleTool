@@ -5,9 +5,22 @@
 function actionBadge(a) { return `<span class="act act-${esc(a)}">${esc(ACTION_LABEL[a] || a)}</span>`; }
 const FLAG_LABEL = { duplicate: 'duplicate', 'name-collision': 'name collision', 'low-confidence': 'low confidence', 'unknown-category': 'unknown category', 'kit-held': 'kit held', warning: 'warning' };
 function flagList(fl) { return (fl || []).map((f) => `<span class="flag flag-${esc(f)}">${esc(FLAG_LABEL[f] || f)}</span>`).join(''); }
+/* Undo plans (samplelib/undo.py) carry summary.kind === 'undo'. Their ops keep the
+   original file name and pack in orig_name / orig_pack, since a rescan may have
+   given the moved files new item ids. */
+function isUndoPlan(p) { return !!(p && p.summary && p.summary.kind === 'undo'); }
+function opName(o) { return o.name || o.orig_name || String(o.source || '').split(/[\\/]/).pop(); }
+function isUndoOp(o) { return (o.flags || []).includes('undo'); }
+function plural(n, one, many) { return `${Fmt.num(n || 0)} ${(n || 0) === 1 ? one : many}`; }
+function relRoot(p) {
+  const r = App.state && App.state.root;
+  if (p && r && p.toLowerCase().startsWith(r.toLowerCase())) return p.slice(r.length).replace(/^[\\/]/, '');
+  return p || '';
+}
 function relDest(p) {
   const s = App.state && App.state.dest_root;
   if (p && s && p.toLowerCase().startsWith(s.toLowerCase())) return 'Samples' + p.slice(s.length);
+  if (p && App.state && App.state.root && p.toLowerCase().startsWith(App.state.root.toLowerCase())) return relRoot(p); // undo: back outside Samples
   return p || '';
 }
 
@@ -20,7 +33,7 @@ const Review = {
   init() {
     const groupKey = (o) => {
       switch (this.group) {
-        case 'pack': return o.pack || '(no pack)';
+        case 'pack': return o.pack || o.orig_pack || '(no pack)';
         case 'kit': return o.kit_name || 'Not in a kit';
         case 'category': return o.category ? o.category.replace('/', ' › ') : 'Unsorted';
         case 'action': return ACTION_LABEL[o.action] || o.action;
@@ -34,9 +47,9 @@ const Review = {
       columns: [
         { key: 'g', label: 'Group', width: 'minmax(80px, .6fr)', cls: 'c-grp', title: (o) => groupKey(o), render: (o, i, prev) => { const g = groupKey(o); return !prev || groupKey(prev) !== g ? `<span class="ellip">${esc(g)}</span>` : '<span class="ditto" aria-hidden="true"></span>'; } },
         { key: 'a', label: 'Action', width: '66px', render: (o) => actionBadge(o.action) },
-        { key: 'src', label: 'Original', width: 'minmax(110px, 1.1fr)', cls: 'c-path', title: (o) => o.source, render: (o) => `<span class="ellip">${esc(o.rel_path || o.source)}</span>` },
+        { key: 'src', label: 'Original', width: 'minmax(110px, 1.1fr)', cls: 'c-path', title: (o) => o.source, render: (o) => `<span class="ellip">${esc(isUndoOp(o) ? relDest(o.source) : (o.rel_path || o.source))}</span>` },
         { key: 'arrow', label: '', width: '14px', cls: 'c-arrow', render: (o) => (o.dest ? '→' : '') },
-        { key: 'dst', label: 'Proposed', width: 'minmax(110px, 1.3fr)', cls: 'c-path c-dest', title: (o) => o.dest || o.canonical || o.reason, render: (o) => o.dest ? `<span class="ellip">${esc(relDest(o.dest))}</span>` : `<span class="ellip dim">${o.action === 'keep' ? 'stays; copy kept at ' + esc(relDest(o.canonical)) : 'stays where it is'}</span>` },
+        { key: 'dst', label: 'Proposed', width: 'minmax(110px, 1.3fr)', cls: 'c-path c-dest', title: (o) => o.dest || o.canonical || o.reason, render: (o) => isUndoOp(o) ? `<span class="ellip${o.action === 'move' ? '' : ' dim'}">${esc(o.action === 'unlink' ? 'link removed; file stays at ' + relDest(o.link_to) : o.action === 'move' ? relRoot(o.dest) : 'stays where it is')}</span>` : o.dest ? `<span class="ellip">${esc(relDest(o.dest))}</span>` : `<span class="ellip dim">${o.action === 'keep' ? 'stays; copy kept at ' + esc(relDest(o.canonical)) : 'stays where it is'}</span>` },
         { key: 'why', label: 'Reason', width: 'minmax(150px, 1.6fr)', cls: 'c-why', title: (o) => o.reason, render: (o) => `${flagList(o.flags)}<span class="ellip dim">${esc(o.reason || '')}</span>` },
       ],
       rowClass: (o, i, prev) => `row-act-${esc(o.action || 'keep')}${prev && groupKey(prev) !== groupKey(o) ? ' grp-start' : ''}`,
@@ -59,6 +72,8 @@ const Review = {
     $('#op-action').addEventListener('change', () => { this.action = $('#op-action').value; this.table.reset(); });
     $('#op-flag').addEventListener('change', () => { this.flag = $('#op-flag').value; this.table.reset(); });
     $('#op-q').addEventListener('input', debounce(() => { this.q = $('#op-q').value.trim(); this.table.reset(); }, 150));
+    $('#stale-banner').insertAdjacentHTML('afterend', '<div class="banner banner-undo" id="undo-banner" role="status" hidden></div>');
+    $('#op-action').insertAdjacentHTML('beforeend', '<option value="unlink">Unlink</option>');
     $('#plan-build').addEventListener('click', () => this.build());
     $('#stale-rebuild').addEventListener('click', () => this.build());
     $('#plan-approve-open').addEventListener('click', () => this.openApprove());
@@ -78,8 +93,10 @@ const Review = {
     App.on('state', (s) => this.renderPlanHead(s));
     App.on('edited', () => { if (this.shown) this.table.refresh(); });
     App.on('job-done', (job) => {
-      if (job === 'plan') { toast('Plan built. Review it, then approve.'); this.table.reset(); this.loadKits(); }
-      if (job === 'execute' || job === 'export') { toast('Approved plan finished running. See Move Log for every result.'); Shell.go('log'); }
+      const undo = isUndoPlan(this.plan());
+      if (job === 'plan' && undo) { this.action = this.flag = ''; $('#op-action').value = ''; $('#op-flag').value = ''; this.renderCards(this.plan()); } // a new undo plan opens unfiltered
+      if (job === 'plan') { toast(undo ? 'Undo plan built. Review it, then approve.' : 'Plan built. Review it, then approve.'); this.table.reset(); this.loadKits(); }
+      if (job === 'execute' || job === 'export') { toast(undo ? 'Undo finished. See Move Log, then rescan your packs folder.' : 'Approved plan finished running. See Move Log for every result.'); Shell.go('log'); }
     });
   },
   hasPlan() { return !!(App.state && App.state.plan); },
@@ -103,22 +120,36 @@ const Review = {
     const p = s && s.plan;
     const running = s && s.progress && s.progress.running;
     const exec = s && s.execution;
-    $('#plan-build').textContent = p ? 'Rebuild plan' : 'Build plan';
+    const undo = isUndoPlan(p);
+    $('#plan-build').textContent = undo ? 'Rebuild undo plan' : p ? 'Rebuild plan' : 'Build plan';
+    this.renderUndoBanner(s);
     $('#plan-build').disabled = !!running || !(s && s.has_inventory);
     $('#plan-build').title = s && !s.has_inventory ? 'Scan your packs first' : '';
     const stale = !!(p && p.stale), approved = !!(p && p.approved && !p.stale);
     $('#stale-banner').hidden = !stale;
     $('#rail-review-dot').hidden = !stale;
     $('#plan-approve-open').disabled = !p || stale || approved || !!running;
-    $('#plan-approve-open').textContent = p ? `Approve plan ${Fmt.hash8(p.plan_hash)}…` : 'Approve plan…';
+    $('#plan-approve-open').textContent = p ? `Approve ${undo ? 'undo plan' : 'plan'} ${Fmt.hash8(p.plan_hash)}…` : 'Approve plan…';
     $('#plan-run').disabled = !approved || !!running;
     $('#plan-run').title = approved ? '' : 'Approve the plan first';
     let st = '<span class="ps ps-none">No plan</span>';
     if (p) st = stale ? '<span class="ps ps-stale">Stale, approval cleared</span>' : approved ? `<span class="ps ps-ok">Approved ${esc(Fmt.hash8(p.plan_hash))}</span>` : '<span class="ps ps-wait">Waiting for your approval</span>';
     if (running && s.progress.job !== 'scan') st = `<span class="ps ps-run">${esc(s.progress.job)} running</span>`;
     $('#plan-state').innerHTML = st;
-    $('#plan-meta').innerHTML = p ? `Plan <code class="mono" title="${esc(p.plan_hash)}">${esc(Fmt.hash8(p.plan_hash))}</code> built ${esc(Fmt.time(p.created))}${exec && exec.ran ? `. Last run ${esc(Fmt.time(exec.ran))}` : ''}` : (s && s.has_inventory ? 'Build a plan to see where every file would go. Building only reads.' : 'Scan your packs folder first, then build a plan.');
+    $('#plan-meta').innerHTML = p ? `${undo ? 'Undo plan' : 'Plan'} <code class="mono" title="${esc(p.plan_hash)}">${esc(Fmt.hash8(p.plan_hash))}</code> built ${esc(Fmt.time(p.created))}${exec && exec.ran ? `. Last run ${esc(Fmt.time(exec.ran))}` : ''}` : (s && s.has_inventory ? 'Build a plan to see where every file would go. Building only reads.' : 'Scan your packs folder first, then build a plan.');
     this.renderCards(p);
+    const hs = $$('#op-table .vt-head [role=columnheader]');
+    if (hs[2]) hs[2].textContent = undo ? 'Now at' : 'Original';
+    if (hs[4]) hs[4].textContent = undo ? 'Goes back to' : 'Proposed';
+  },
+
+  renderUndoBanner(s) {
+    const p = s && s.plan, b = $('#undo-banner');
+    if (!isUndoPlan(p)) { b.hidden = true; return; }
+    const sm = p.summary, ba = sm.by_action || {};
+    const rescan = s.undo && s.undo.rescan_needed;
+    b.hidden = false;
+    b.innerHTML = `<strong>Undo plan</strong><span class="ub-text">Reverses the run of ${esc(Fmt.time(typeof sm.run_ts === 'number' ? new Date(sm.run_ts * 1000).toISOString() : sm.run_ts))} (plan <code class="mono">${esc(Fmt.hash8(sm.run_plan_hash))}</code>): ${plural(ba.move, 'file goes', 'files go')} back to their original folders and ${plural(ba.unlink, 'kit link is', 'kit links are')} removed.${ba.hold ? ` ${plural(ba.hold, 'held file stays where it is', 'held files stay where they are')}.` : ''}${rescan ? ' <span class="ub-warn">This undo has run: rescan before building a new plan.</span>' : ''}</span>`;
   },
 
   renderCards(p) {
@@ -129,7 +160,14 @@ const Review = {
     const tot = s.total_files || 0;
     const share = (n) => (tot ? Math.min(100, Math.round((n || 0) / tot * 100)) : 0);
     const card = (k, v, sub, cls, act, pct) => `<button type="button" class="card ${cls || ''}${act && this.action === act ? ' on' : ''}" ${act ? `data-act="${act}" aria-pressed="${this.action === act}"` : 'disabled'}><span class="card-k">${k}</span><span class="card-v mono">${v}</span>${sub ? `<span class="card-s mono">${sub}</span>` : ''}<span class="card-bar" aria-hidden="true"><i style="--p:${pct || 0}%"></i></span></button>`;
-    box.innerHTML = [
+    box.classList.toggle('cards-undo', isUndoPlan(p));
+    box.innerHTML = isUndoPlan(p) ? [
+      card('files in undo plan', Fmt.num(s.total_files), Fmt.bytes(s.total_bytes), 'card-total', '', tot ? 100 : 0),
+      card('move back', Fmt.num(ba.move || 0), bb.move !== undefined ? Fmt.bytes(bb.move) : '', 'c-move', 'move', share(ba.move)),
+      card('remove kit link', Fmt.num(ba.unlink || 0), 'file stays', 'c-unlink', 'unlink', share(ba.unlink)),
+      card('already back', Fmt.num(ba.keep || 0), 'nothing to do', 'c-keep', 'keep', share(ba.keep)),
+      card('held for review', Fmt.num(ba.hold || 0), 'not touched', 'c-hold', 'hold', share(ba.hold)),
+    ].join('') : [
       card('files in plan', Fmt.num(s.total_files), Fmt.bytes(s.total_bytes), 'card-total', '', tot ? 100 : 0),
       card('move', Fmt.num(ba.move || 0), bb.move !== undefined ? Fmt.bytes(bb.move) : '', 'c-move', 'move', share(ba.move)),
       card('link (kit copies)', Fmt.num(ba.link || 0), bb.link !== undefined ? Fmt.bytes(bb.link) + ' not copied' : '', 'c-link', 'link', share(ba.link)),
@@ -154,6 +192,7 @@ const Review = {
     const box = $('#op-detail');
     box.hidden = false;
     const row = (l, v, cls) => v ? `<div class="path-blk"><span class="path-l">${l}</span><code class="path ${cls || ''}" title="${esc(v)}">${esc(v)}</code></div>` : '';
+    if ((o.flags || []).includes('undo')) return this.showUndoOp(o, box, row);
     box.innerHTML = `
       <div class="od-head">${actionBadge(o.action)}<h3 class="ellip" title="${esc(o.name)}">${esc(o.name)}</h3>
         <button type="button" class="ib" id="od-close" aria-label="Close details"><svg><use href="#i-x"/></svg></button></div>
@@ -183,6 +222,23 @@ const Review = {
         await App.afterEdit();
       } catch (e) { toast(explain409(e, 'Not changed'), 'err'); }
     };
+  },
+  showUndoOp(o, box, row) {
+    const name = opName(o);
+    box.innerHTML = `
+      <div class="od-head">${actionBadge(o.action)}<h3 class="ellip" title="${esc(name)}">${esc(name)}</h3>
+        <button type="button" class="ib" id="od-close" aria-label="Close details"><svg><use href="#i-x"/></svg></button></div>
+      <p class="od-why">${esc(o.reason || '')}</p>
+      ${row(o.action === 'unlink' ? 'Link to remove' : 'Now at', o.source)}
+      ${o.action === 'unlink' ? row('File stays at', o.link_to, 'path-dest') : row('Goes back to', o.dest, 'path-dest')}
+      <p class="dim small mono">${Fmt.bytes(o.size)} · sha256 ${esc(Fmt.hash8(o.sha256))} · op ${esc(o.id)}</p>
+      <div class="ins-actions">
+        <button class="ib" type="button" id="od-copy" aria-label="Copy current path" title="Copy current path"><svg><use href="#i-copy"/></svg></button>
+        <button class="ib" type="button" id="od-reveal" aria-label="Show in Explorer" title="Show in Explorer"><svg><use href="#i-folder"/></svg></button>
+      </div>`;
+    $('#od-close').onclick = () => { box.hidden = true; this.table.body.focus(); };
+    $('#od-copy').onclick = () => copyText(o.source);
+    $('#od-reveal').onclick = () => reveal({ path: o.source });
   },
   closeOp() { const b = $('#op-detail'); if (!b.hidden) { b.hidden = true; return true; } return false; },
 
@@ -279,6 +335,15 @@ const Review = {
 
   /* ---------- build / approve / run ---------- */
   async build() {
+    const p = this.plan();
+    if (isUndoPlan(p)) {
+      try {
+        await API.post('/api/undo/build', { run_id: p.summary.undo_of });
+        toast('Rebuilding the undo plan. This only reads your files.');
+        Shell.pollSoon();
+      } catch (e) { toast(explain409(e, 'Can’t rebuild the undo plan'), 'err'); }
+      return;
+    }
     try {
       await API.post('/api/plan/build');
       toast('Building plan. This only reads your files.');
@@ -291,10 +356,13 @@ const Review = {
     const s = p.summary || {}, ba = s.by_action || {}, bb = s.bytes_by_action || {};
     $('#approve-hash').textContent = Fmt.hash8(p.plan_hash);
     $('#approve-go').textContent = 'Approve plan ' + Fmt.hash8(p.plan_hash);
-    const desc = { move: 'moved into Samples (same drive: hard link, verify, then remove original)', link: 'hard-linked inside kits (no extra space)', keep: 'left in place (duplicate of a kept copy)', hold: 'held: not touched', exclude: 'excluded: not touched' };
+    const undo = isUndoPlan(p);
+    $('#approve-h').firstChild.textContent = undo ? 'Approve undo plan ' : 'Approve plan ';
+    const desc = undo ? { move: 'moved back to the original folder (hard link, verify, then remove the Samples copy)', unlink: 'kit hard link removed; the file stays at its other name', keep: 'already back: nothing to do', hold: 'held: not touched' }
+      : { move: 'moved into Samples (same drive: hard link, verify, then remove original)', link: 'hard-linked inside kits (no extra space)', keep: 'left in place (duplicate of a kept copy)', hold: 'held: not touched', exclude: 'excluded: not touched' };
     $('#approve-table').innerHTML = '<thead><tr><th>Action</th><th class="num">Files</th><th class="num">Size</th><th>What happens</th></tr></thead><tbody>' +
-      ['move', 'link', 'keep', 'hold', 'exclude'].map((a) => `<tr><td>${actionBadge(a)}</td><td class="num mono">${Fmt.num(ba[a] || 0)}</td><td class="num mono">${bb[a] !== undefined ? Fmt.bytes(bb[a]) : '—'}</td><td class="dim">${desc[a]}</td></tr>`).join('') +
-      `</tbody><tfoot><tr><td>Total</td><td class="num mono">${Fmt.num(s.total_files)}</td><td class="num mono">${Fmt.bytes(s.total_bytes)}</td><td class="dim">${Fmt.bytes(s.duplicate_bytes_avoided)} of duplicates not stored twice</td></tr></tfoot>`;
+      (undo ? ['unlink', 'move', 'keep', 'hold'] : ['move', 'link', 'keep', 'hold', 'exclude']).map((a) => `<tr><td>${actionBadge(a)}</td><td class="num mono">${Fmt.num(ba[a] || 0)}</td><td class="num mono">${bb[a] !== undefined ? Fmt.bytes(bb[a]) : '—'}</td><td class="dim">${desc[a]}</td></tr>`).join('') +
+      `</tbody><tfoot><tr><td>Total</td><td class="num mono">${Fmt.num(s.total_files)}</td><td class="num mono">${Fmt.bytes(s.total_bytes)}</td><td class="dim">${undo ? 'reverses an earlier run' : Fmt.bytes(s.duplicate_bytes_avoided) + ' of duplicates not stored twice'}</td></tr></tfoot>`;
     $('#approve-check').checked = false;
     $('#approve-go').disabled = true;
     $('#approve-err').hidden = true;
@@ -319,7 +387,7 @@ const Review = {
     const p = this.plan(); if (!p) return;
     const ba = (p.summary && p.summary.by_action) || {};
     $('#run-hash').textContent = Fmt.hash8(p.plan_hash);
-    $('#run-text').textContent = `This moves ${Fmt.num(ba.move || 0)} files and creates ${Fmt.num(ba.link || 0)} hard links in ${App.state.dest_root}. Every file is re-checked against the plan before it is touched; anything that changed is held, never overwritten. Held and excluded files are not touched.`;
+    $('#run-text').textContent = isUndoPlan(p) ? `This undo moves ${Fmt.num(ba.move || 0)} files back to their original folders and removes ${Fmt.num(ba.unlink || 0)} kit links. Each file is re-checked first; anything that changed since the run, or whose original location is taken, is held and never overwritten. Folders created in Samples stay (they may be empty). Rescan afterwards.` : `This moves ${Fmt.num(ba.move || 0)} files and creates ${Fmt.num(ba.link || 0)} hard links in ${App.state.dest_root}. Every file is re-checked against the plan before it is touched; anything that changed is held, never overwritten. Held and excluded files are not touched.`;
     $('#run-err').hidden = true;
     $('#run-dlg').showModal();
     $('#run-go').focus();

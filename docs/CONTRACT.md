@@ -152,3 +152,37 @@ each meta key to `{source, confidence}` and `review_status` is one of
 `ok | needs-review | edited | held | excluded | done`.
 
 Errors: non-2xx with `{error: "message"}`.
+
+### Mix matching (analysis.py, matching.py)
+
+```python
+# analysis.py  (read-only; WAV/AIFF/AIFC, first MAX_SECONDS=30 s)
+ANALYSIS_VERSION: int
+def analyze(path, ext, want=frozenset({"tempo", "key"})) -> tuple[dict | None, list[str]]
+#   want: "tempo" (bpm, bars, on_grid, downbeat_ms), "key", "root" (one-shot pitch)
+#   -> {v, bpm, bpm_conf, bars, on_grid, downbeat_ms, key, key_conf}
+def key_compat(a, b) -> tuple[float, str]   # same 1.0, relative 0.9, Camelot neighbor 0.7
+def camelot(key) -> str | None              # "8A" = A minor
+
+# classify.py
+def analyze_items(items, cache, progress=None, cancel=None, analyzer=None) -> dict
+#   scan phase "analyzing"; sets item["analysis"]; cache key sha256|version|want,
+#   stored as analysis_cache.json.gz in the data dir. Evidence order:
+#   tag > filename > folder > analysis; manual edits always win.
+
+# matching.py
+def matches(store, item_id, role=None, limit=30) -> list[{row, score, reasons}]
+def starter(store, key=None, bpm=None, locked=None, seed=None, avoid=None) -> dict
+#   -> {key, bpm, seed, slots: {drums, bass, melody: {row, score, reasons, locked} | None},
+#       missing: {slot: reason}, options: {slot: count of fitting loops}}
+```
+
+| Method | Path | Body / query | Returns |
+|---|---|---|---|
+| GET | `/api/samples/<id>/matches` | `role` (drums/bass/melody/vocal-fx), `limit` | `{items: [{row: SampleRow, score, reasons}]}`; 404 unknown id, 400 unknown role |
+| POST | `/api/starter` | `{key?, bpm?, locked?: {slot: id}, avoid?: {slot: id}, seed?}` | starter dict above |
+| GET | `/api/starters` | | `{items: [{id, name, key, bpm, ids, created, rows}]}` |
+| POST | `/api/starters` | `{name, key, bpm, ids}` | `{ok, starter}` (stored in `starters.json`, data dir) |
+| DELETE | `/api/starters/<id>` | X-SLO header | `{ok}`; 404 if missing |
+
+SampleRow adds `bars`, `on_grid`, `downbeat_ms` (from analysis, else null).

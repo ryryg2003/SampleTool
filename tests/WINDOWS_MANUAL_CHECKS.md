@@ -120,6 +120,36 @@ $before = Snap
 Compare-Object $before (Snap) -Property FullName, Length, LastWriteTimeUtc, H   # must print nothing
 ```
 
+## 9. Desktop shortcut, single window, idle quit, Settings
+Automated: `tests/test_settings.py` (`WindowsDesktopTest`) runs
+`Create Desktop Shortcut.bat` into a temp folder and checks the `.lnk` target,
+arguments, working folder and icon; it also calls the window lookup. What only
+a person at the desktop can confirm:
+
+1. Run `Create Desktop Shortcut.bat` once. A "Sample Organizer" icon (amber bars
+   on a dark square) appears on the desktop, including a OneDrive-redirected one.
+2. Double-click it. No console window appears; the Edge app window opens and
+   the taskbar/title bar show the app. `%LOCALAPPDATA%\SampleOrganizer\logs\app.log`
+   gets the startup lines (collection, data folder, URL).
+3. Minimise the window and double-click the shortcut again. The **same** window is
+   restored and comes to the front, a toast says the app is already open, and
+   no second window or second `pythonw.exe` appears (Task Manager). Repeat with the
+   window behind another app instead of minimised. If Windows only flashes the
+   taskbar button instead of raising the window, note it (foreground lock).
+4. Close the window. Within about 3 minutes `pythonw.exe` exits (log line
+   "shutting down"). Start a long scan, close the window during the scan: the
+   process stays until the scan ends, then quits about 3 minutes later.
+   Repeat with an approved run: it must never quit mid-run.
+5. Put the PC to sleep with the window open for over 3 minutes, wake it: the app
+   keeps working (the idle clock restarts after a sleep).
+6. Settings: change the default volume and density, close and reopen from the
+   shortcut; both stick. Save port 8790, restart: the URL uses 8790. Switch the
+   collection folder to `%TEMP%\SampleOrganizerTest\Sample Packs`: the
+   confirmation says the plan/approval are cleared, the Scan view shows the scan.
+   While a scan runs the Switch button is disabled with an explanation.
+7. `Launch Sample Organizer.bat` still opens a console showing the same messages
+   (troubleshooting view) and uses the saved folder.
+
 ## Cleanup
 ```powershell
 Get-ChildItem $T -Recurse -Attributes ReparsePoint | ForEach-Object { cmd /c rmdir "$($_.FullName)" }

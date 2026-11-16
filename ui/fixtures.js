@@ -2,6 +2,8 @@
    Enabled with ?fixture=1 or when /api/state cannot be loaded.
    Deterministic synthetic data (~2,000 rows, 15 packs, kits, duplicates,
    held items, a plan and a move log). Edits mutate memory only. */
+// Feature files push (method, path, query, body, state, helpers) => response or null.
+window.FixtureExt = window.FixtureExt || [];
 (function () {
   'use strict';
 
@@ -426,7 +428,74 @@
       return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: 'base' })) * m;
     });
   }
-  function row(it) { const r = Object.assign({}, it); delete r.tags_raw; return r; }
+  function row(it) {
+    const r = Object.assign({}, it); delete r.tags_raw;
+    if (r.bars === undefined) {
+      const b = r.loop_type === 'loop' && r.bpm && r.duration_s ? r.duration_s * r.bpm / 240 : 0;
+      r.bars = b >= 1 ? Math.round(b) : null; r.on_grid = r.bars ? (r.name.length % 5 !== 0) : null;
+    }
+    return r;
+  }
+  /* ---- mix matching (simplified version of samplelib/matching.py) ---- */
+  const ROLE = { 'One-Shots/Drums': 'drums', 'Loops/Drum Loops': 'drums', 'One-Shots/Bass & 808s': 'bass', 'Loops/Bass Loops': 'bass', 'One-Shots/Instruments': 'melody', 'Loops/Melody Loops': 'melody', 'One-Shots/FX & Vocals': 'vocal-fx', 'Loops/Vocal & FX Loops': 'vocal-fx' };
+  const starters = [];
+  function pairScore(a, b) {
+    let s = 0, w = 0; const why = [];
+    if (a.loop_type === 'loop' && b.loop_type === 'loop') {
+      w += 0.45;
+      if (a.bpm && b.bpm) {
+        if (Math.abs(a.bpm - b.bpm) / a.bpm <= 0.02) { s += 0.45; why.push(`same tempo (${Math.round(b.bpm)} BPM)`); }
+        else if (Math.abs(a.bpm - 2 * b.bpm) / a.bpm <= 0.02) { s += 0.36; why.push(`half-time (${Math.round(a.bpm)} vs ${Math.round(b.bpm)} BPM)`); }
+        else if (Math.abs(a.bpm - b.bpm / 2) / a.bpm <= 0.02) { s += 0.36; why.push(`double-time (${Math.round(a.bpm)} vs ${Math.round(b.bpm)} BPM)`); }
+        else why.push(`tempo clash (${Math.round(a.bpm)} vs ${Math.round(b.bpm)} BPM)`);
+      } else { s += 0.18; why.push('tempo unknown'); }
+    }
+    if (ROLE[a.category] !== 'drums' && ROLE[b.category] !== 'drums') {
+      w += 0.4;
+      if (a.key && b.key) { if (a.key === b.key) { s += 0.4; why.push('same key'); } else why.push(`keys clash (${a.key} vs ${b.key})`); }
+      else { s += 0.16; why.push('key unknown'); }
+    }
+    let sc = w ? s / w : 0.3;
+    if (a.pack && a.pack === b.pack) { sc += 0.03; why.push('same pack'); }
+    return [Math.min(1, sc), why];
+  }
+  function fixtureMatches(src, role, limit) {
+    const out = [];
+    for (const it of items) {
+      const r = ROLE[it.category];
+      if (it === src || it.kind !== 'audio' || it.excluded || !r || (role && r !== role) || (src.sha256 && it.sha256 === src.sha256)) continue;
+      let [sc, why] = pairScore(src, it);
+      if (!role && r === ROLE[src.category]) sc *= 0.85;
+      if (sc >= 0.3) out.push({ row: row(it), score: Math.round(sc * 1000) / 1000, reasons: why });
+    }
+    out.sort((a, b) => b.score - a.score || a.row.name.localeCompare(b.row.name));
+    return out.slice(0, limit || 30);
+  }
+  function fixtureStarter(b) {
+    let seed = +b.seed || (1 + Math.floor(Math.random() * 999999));
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const locked = b.locked || {};
+    const out = { key: b.key || null, bpm: b.bpm || null, seed: +b.seed || seed, slots: {}, missing: {}, options: {} };
+    const avoid = b.avoid || {};
+    const loops = (role) => items.filter((i) => i.loop_type === 'loop' && ROLE[i.category] === role && !i.excluded);
+    for (const id of Object.values(locked)) { const it = byId.get(id); if (it) { out.key = out.key || it.key; out.bpm = out.bpm || it.bpm; } }
+    if (!out.key || !out.bpm) { const mel = loops('melody').filter((i) => i.key && i.bpm); if (mel.length) { const pk = mel[Math.floor(rnd() * mel.length)]; out.key = out.key || pk.key; out.bpm = out.bpm || pk.bpm; } }
+    const tgt = { loop_type: 'loop', category: null, key: out.key, bpm: out.bpm };
+    for (const slot of ['drums', 'bass', 'melody']) {
+      let it = locked[slot] ? byId.get(locked[slot]) : null;
+      if (!it) {
+        const good = loops(slot).map((i) => [pairScore(tgt, i)[0], i]).filter((x) => x[0] >= 0.75).sort((x, y) => y[0] - x[0]).slice(0, 8);
+        out.options[slot] = good.length;
+        const fresh = good.filter((x) => x[1].id !== avoid[slot]);
+        const pool = fresh.length ? fresh : good;
+        it = pool.length ? pool[Math.floor(rnd() * pool.length)][1] : null;
+      }
+      if (!it) { out.slots[slot] = null; out.missing[slot] = `No ${slot} loops fit ${out.key || 'any key'} at ${out.bpm || 'any'} BPM`; continue; }
+      const [sc, why] = pairScore(tgt, it);
+      out.slots[slot] = { row: row(it), score: Math.round(sc * 1000) / 1000, reasons: why, locked: !!locked[slot] };
+    }
+    return out;
+  }
   function kitOut(k) {
     const ms = k.member_ids.map((id) => byId.get(id)).filter(Boolean);
     return Object.assign({}, k, { member_count: ms.length, bytes: ms.reduce((s, i) => s + i.size, 0), proposed_root: `${DEST}\\Complete Kits\\${k.manufacturer || 'Unknown Maker'}\\${k.name}` });
@@ -468,7 +537,7 @@
     if (p === '/api/scan' && method === 'POST') {
       if (st.progress.running) return err(409, 'A ' + st.progress.job + ' job is already running');
       if (body.root) st.root = body.root;
-      runJob('scan', ['walking', 'hashing', 'metadata', 'classifying', 'kits'], items.length, () => { st.has_inventory = true; markStale(); });
+      runJob('scan', ['walking', 'hashing', 'metadata', 'classifying', 'analyzing', 'kits'], items.length, () => { st.has_inventory = true; markStale(); });
       return ok({ ok: true });
     }
     if (p === '/api/cancel' && method === 'POST') {
@@ -490,6 +559,22 @@
       const it = byId.get(m[1]); if (!it) return err(404, 'No sample with id ' + m[1]);
       const meta = {}; for (const k of Object.keys(it.prov)) meta[k] = { value: it[k], source: it.prov[k].source, confidence: it.prov[k].confidence };
       return ok(Object.assign(row(it), { meta, tags_raw: it.tags_raw, audio: it.kind === 'audio' ? { format: it.ext.slice(1), sample_rate: it.sample_rate, channels: it.channels, bits: it.bits, duration_s: it.duration_s } : null }));
+    }
+    m = p.match(/^\/api\/samples\/([^/]+)\/matches$/);
+    if (m && method === 'GET') {
+      const src = byId.get(m[1]); if (!src) return err(404, 'No sample with id ' + m[1]);
+      return ok({ items: fixtureMatches(src, q.get('role'), +(q.get('limit') || 30)) });
+    }
+    if (p === '/api/starter' && method === 'POST') return ok(fixtureStarter(body));
+    if (p === '/api/starters' && method === 'GET') return ok({ items: starters.map((s) => Object.assign({}, s, { rows: s.ids.map((i) => byId.get(i)).filter(Boolean).map(row) })) });
+    if (p === '/api/starters' && method === 'POST') {
+      const s = { id: randHex(12), name: body.name || 'Untitled', key: body.key || null, bpm: body.bpm || null, ids: body.ids || [], created: new Date().toISOString() };
+      starters.push(s); return ok({ ok: true, starter: s });
+    }
+    m = p.match(/^\/api\/starters\/([^/]+)$/);
+    if (m && method === 'DELETE') {
+      const i = starters.findIndex((s) => s.id === m[1]); if (i < 0) return err(404, 'Saved set not found');
+      starters.splice(i, 1); return ok({ ok: true });
     }
     if (p.startsWith('/api/audio/')) return err(404, 'Audio unavailable in fixture mode');
     if (p === '/api/kits' && method === 'GET') {
@@ -581,6 +666,7 @@
       return ok({ total: rs.length, items: rs.slice(off, off + lim) });
     }
     if (p === '/api/reveal' && method === 'POST') return ok({ ok: true, fixture: true });
+    for (const ext of (window.FixtureExt || [])) { const r = ext(method, p, q, body, st, { ok, err, items }); if (r) return r; }
     return err(404, 'Fixture has no route for ' + method + ' ' + p);
   }
 

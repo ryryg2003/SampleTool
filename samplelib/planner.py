@@ -307,6 +307,8 @@ def build_plan(items, kits, root: str, dest_root: str) -> dict:
         else:   # place without destination (should not happen)
             ops.append(_op(it, "hold", None, "no destination could be determined", flags))
 
+    _attach_sidecars(ops, incoming, move_op_of, taken)
+
     ops.sort(key=lambda o: (ACTION_ORDER[o["action"]],
                             (o.get("dest") or o.get("source") or "").casefold(), o["id"]))
 
@@ -343,3 +345,43 @@ def _op(it, action, dest, reason, flags):
             "kit_id": it.get("kit_id"), "category": _category(it) if it.get("kind") == "audio"
             else (PRESETS_MIDI if it.get("kind") in ("midi", "preset") else None),
             "reason": reason, "flags": list(dict.fromkeys(flags))}
+
+
+SIDECAR_SUFFIX = ".license.txt"
+
+
+def _attach_sidecars(ops, incoming, move_op_of, taken) -> None:
+    """Let ``<sound>.license.txt`` (written by Find Sounds) travel with its sound.
+
+    A sidecar that would otherwise be kept in place becomes a move to
+    ``<sound destination>.license.txt`` when its sound (same folder) is moved and
+    that destination is free. It depends on the sound's move, so if the sound is
+    held at run time the sidecar is held too. Mutates ``ops`` in place.
+    """
+    by_dir_name, by_id = {}, {}
+    for it in incoming:
+        by_id[it["id"]] = it
+        rel = it.get("rel_path", "")
+        d = rel.rsplit("/", 1)[0].casefold() if "/" in rel else ""
+        by_dir_name[(d, (it.get("name") or "").casefold())] = it
+    for idx, o in enumerate(ops):
+        if o["action"] != "keep" or o.get("canonical"):
+            continue
+        it = by_id.get(o["item_id"])
+        name = (it or {}).get("name") or ""
+        if not it or not name.casefold().endswith(SIDECAR_SUFFIX):
+            continue
+        rel = it.get("rel_path", "")
+        d = rel.rsplit("/", 1)[0].casefold() if "/" in rel else ""
+        sound = by_dir_name.get((d, name[:-len(SIDECAR_SUFFIX)].casefold()))
+        mv = move_op_of.get(sound["id"]) if sound else None
+        if not mv or not it.get("sha256"):
+            continue
+        dest = mv["dest"] + SIDECAR_SUFFIX
+        if _pkey(dest) in taken:
+            continue
+        taken[_pkey(dest)] = (it.get("sha256"), it["id"])
+        new = _op(it, "move", dest, "license file travels with %s" % sound.get("name"),
+                  list(o.get("flags") or []) + ["sidecar"])
+        new["depends_on"] = mv["id"]
+        ops[idx] = new

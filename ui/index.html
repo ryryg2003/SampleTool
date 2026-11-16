@@ -7,10 +7,16 @@
 <link rel="stylesheet" href="app.css">
 <link rel="stylesheet" href="library.css">
 <link rel="stylesheet" href="views.css">
+<link rel="stylesheet" href="features.css">
 <link rel="stylesheet" href="dialogs.css">
 <link rel="stylesheet" href="player.css">
+<link rel="stylesheet" href="media.css">
+<link rel="stylesheet" href="collections.css">
+<link rel="stylesheet" href="undo.css">
+<link rel="stylesheet" href="findsounds.css">
+<link rel="stylesheet" href="settings.css">
 <link rel="stylesheet" href="motion.css">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2309051A'/%3E%3Cpath d='M3 11V7M6 11V4M9 11V6M12 11V8' stroke='%23FF3FD2' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -18,6 +24,7 @@
   <symbol id="i-review" viewBox="0 0 24 24"><path d="M5 6h9M5 11h9M5 16h5M15 16l2.2 2.2L21 14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-library" viewBox="0 0 24 24"><path d="M4 19V5M8 19V5M12 19l0-12M15.5 18.5l-2.5-12 3-.6 2.5 12z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-log" viewBox="0 0 24 24"><path d="M12 7v5l3 2M4 12a8 8 0 1 0 2.3-5.6M4 4v3h3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M5 18V9M9.5 18V5M14 18v-6M18.5 18V8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="18.5" cy="5" r="1.6" fill="currentColor"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></symbol>
   <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1" fill="currentColor"/></symbol>
   <symbol id="i-loop" viewBox="0 0 24 24"><path d="M17 4l3 3-3 3M20 7H8a4 4 0 0 0-4 4M7 20l-3-3 3-3M4 17h12a4 4 0 0 0 4-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -28,6 +35,8 @@
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15 15l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-fx" viewBox="0 0 24 24"><path d="M12 3.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2L5 10.5l5.2-1.8zM18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 4l2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z" fill="currentColor"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 
@@ -42,7 +51,10 @@
     <button class="rail-btn" data-view="scan" aria-label="Scan"><svg><use href="#i-scan"/></svg><span>Scan</span></button>
     <button class="rail-btn" data-view="review" aria-label="Review"><svg><use href="#i-review"/></svg><span>Review</span><b class="rail-dot" id="rail-review-dot" hidden></b></button>
     <button class="rail-btn" data-view="library" aria-label="Library"><svg><use href="#i-library"/></svg><span>Library</span></button>
+    <button class="rail-btn" data-view="starter" aria-label="Beat Starter"><svg><use href="#i-spark"/></svg><span>Starter</span></button>
     <button class="rail-btn" data-view="log" aria-label="Move Log"><svg><use href="#i-log"/></svg><span>Move Log</span></button>
+    <button class="rail-btn" data-view="find" aria-label="Find Sounds"><svg><use href="#i-search"/></svg><span>Find Sounds</span></button>
+    <button class="rail-btn" data-view="settings" aria-label="Settings"><svg><use href="#i-gear"/></svg><span>Settings</span></button>
     <div class="rail-foot">
       <span class="fixture-flag" id="fixture-flag" hidden title="Fake data in memory. Nothing on disk is read or changed.">Fixture data</span>
       <div class="accent-pick" id="accent-pick" role="radiogroup" aria-label="Accent colors">
@@ -154,7 +166,14 @@
 
     <!-- ============ LIBRARY ============ -->
     <section class="view view-library" id="view-library" aria-labelledby="lib-h" hidden>
-      <aside class="packs glass" aria-label="Packs">
+      <aside class="packs glass" aria-label="Collections and packs">
+        <section class="coll-side" id="coll-side" aria-labelledby="coll-h">
+          <div class="coll-head">
+            <h2 class="side-h" id="coll-h">Collections</h2>
+            <button type="button" class="ib" id="coll-new" aria-label="New collection" title="New collection"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></button>
+          </div>
+          <ul class="coll-list" id="coll-list" aria-label="Favorites and collections"></ul>
+        </section>
         <div class="packs-head">
           <h2 class="side-h">Packs <span class="mono dim" id="pack-n"></span></h2>
           <div class="search search-sm"><svg aria-hidden="true"><use href="#i-search"/></svg><input class="input" id="pack-q" type="search" placeholder="Pack or maker" aria-label="Search packs by name or manufacturer"></div>
@@ -188,12 +207,14 @@
             <select class="input" data-f="genre" aria-label="Genre"><option value="">Genre</option></select>
             <select class="input" data-f="manufacturer" aria-label="Manufacturer"><option value="">Maker</option></select>
             <span class="bpm-range"><input class="input mono" data-f="bpm_min" type="number" min="0" max="999" placeholder="BPM" aria-label="Minimum BPM"><span aria-hidden="true">–</span><input class="input mono" data-f="bpm_max" type="number" min="0" max="999" placeholder="max" aria-label="Maximum BPM"></span>
+            <button type="button" class="fbtn" id="lib-new" aria-pressed="false" title="Files that arrived after the last approved run (or the first scan)">New since last run <b class="mono" id="lib-new-n"></b></button>
             <select class="input" data-f="status" aria-label="Review status"><option value="">Status</option><option value="ok">OK</option><option value="needs-review">Needs review</option><option value="edited">Edited</option><option value="held">Held</option><option value="excluded">Excluded</option><option value="done">Organized</option></select>
           </div>
           <div class="chips-row" id="lib-chips-row">
             <div class="chips" id="lib-chips"></div>
             <span class="count mono" id="lib-count"></span>
             <label class="check check-sm" title="By default only audio, MIDI and presets are listed. Tick to include artwork, documents and other files."><input type="checkbox" id="lib-allfiles"> Show all files</label>
+            <button class="btn btn-small btn-ghost" id="lib-save-smart" hidden title="Save this search and these filters as a smart collection">Save search…</button>
             <button class="btn btn-small btn-ghost" id="lib-clear" hidden>Clear all filters</button>
           </div>
           </div>
@@ -202,6 +223,8 @@
             <span id="sel-n" class="mono"></span>
             <button class="btn btn-small" id="sel-edit">Bulk edit…</button>
             <button class="btn btn-small" id="sel-kit">Create kit…</button>
+            <button class="btn btn-small" id="sel-star"><svg><use href="#i-star"/></svg>Star</button>
+            <button class="btn btn-small" id="sel-coll">Add to collection…</button>
             <button class="btn btn-small btn-ghost" id="sel-clear">Clear selection</button>
           </div>
         </div>
@@ -211,15 +234,47 @@
       <aside class="inspector glass" id="inspector" aria-label="Sample details"></aside>
     </section>
 
+    <!-- ============ BEAT STARTER ============ -->
+    <section class="view view-starter" id="view-starter" aria-labelledby="bs-h" hidden>
+      <header class="bs-head">
+        <div><h1 id="bs-h">Beat Starter</h1><p class="dim">A drum loop, bass and melody that fit together. Lock what you like, reroll the rest.</p></div>
+        <div class="bs-ctl">
+          <select class="input" id="bs-key" aria-label="Key"></select>
+          <input class="input mono" id="bs-bpm" type="number" min="60" max="200" placeholder="Any BPM" aria-label="Tempo in BPM">
+          <button class="btn btn-primary" id="bs-new" type="button">New set</button>
+        </div>
+      </header>
+      <div class="bs-bar"><span class="mono" id="bs-target"></span>
+        <button class="btn" id="bs-playall" type="button">Play all</button>
+        <button class="btn btn-ghost" id="bs-save" type="button" disabled>Save set</button></div>
+      <div class="bs-slots" id="bs-slots"></div>
+      <h2 class="side-h">Saved sets</h2>
+      <ul class="bs-saved" id="bs-saved"></ul>
+    </section>
+
+    <!-- ============ FIND SOUNDS (ui/findsounds.js) ============ -->
+    <section class="view view-find" id="view-find" aria-labelledby="find-h" hidden></section>
+
+    <!-- ============ SETTINGS (ui/settings.js) ============ -->
+    <section class="view view-settings" id="view-settings" aria-labelledby="settings-h" hidden></section>
+
     <!-- ============ MOVE LOG ============ -->
     <section class="view view-log" id="view-log" aria-labelledby="log-h" hidden>
-      <header class="view-head head-card vh-card">
+      <header class="view-head review-head head-card vh-card">
         <div class="vh-text">
           <span class="vh-eyebrow">Move log</span>
           <h1 id="log-h">Move log</h1>
           <p class="view-sub" id="log-meta">What happened to each file when the approved plan ran.</p>
         </div>
+        <div class="head-actions">
+          <span class="undo-state" id="undo-state"></span>
+          <button class="btn" id="log-undo" type="button" hidden>Undo this run…</button>
+        </div>
       </header>
+      <div class="banner banner-undo" id="undo-rescan" role="status" hidden>
+        <strong>Files were put back.</strong> <span>The library list still shows the state before the undo. Rescan before you build a new plan.</span>
+        <button class="btn btn-small" id="undo-rescan-go" type="button">Rescan now</button>
+      </div>
       <div class="log-top">
         <div class="panel glass verify" id="verify"></div>
         <div class="panel glass reports" id="reports"></div>
@@ -241,6 +296,10 @@
   </main>
 
   <footer class="deck">
+    <svg class="sr" aria-hidden="true" focusable="false">
+      <symbol id="i-retrig" viewBox="0 0 24 24"><path d="M5 5v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M9 6.5v11l9-5.5z" fill="currentColor"/></symbol>
+      <symbol id="i-clip" viewBox="0 0 24 24"><rect x="6" y="5" width="12" height="15" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M9.5 3.5h5v3h-5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 11h6M9 14.5h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    </svg>
     <div class="transport glass" id="transport" aria-label="Audition player">
       <button class="tp-btn tp-play" id="tp-play" aria-label="Play" title="Play / stop (Space)"><svg><use href="#i-play"/></svg></button>
       <div class="tp-meta">
@@ -250,14 +309,15 @@
       </div>
       <div class="tp-track" aria-live="off">
         <span class="tp-time mono" id="tp-time">0:00.0</span>
-        <div class="tp-wave" id="tp-wave-box">
-          <canvas class="tp-wave-c tp-wave-base" id="tp-wave" aria-hidden="true"></canvas>
-          <canvas class="tp-wave-c tp-wave-lit" id="tp-wave-lit" aria-hidden="true"></canvas>
+        <div class="tp-wave is-empty" id="tp-wave" title="Click or drag to seek">
+          <canvas class="tp-wave-c" id="tp-wave-c" aria-hidden="true"></canvas>
+          <span class="tp-wave-ph" id="tp-wave-ph" aria-hidden="true"></span>
           <input type="range" class="scrub" id="tp-scrub" min="0" max="1000" value="0" step="1" aria-label="Playback position" disabled>
         </div>
         <span class="tp-dur mono" id="tp-dur">0:00.0</span>
       </div>
       <button class="tp-btn tp-toggle" id="tp-loop" aria-label="Loop" aria-pressed="false" title="Loop (L)"><svg><use href="#i-loop"/></svg></button>
+      <button class="tp-btn tp-toggle" id="tp-oneshot" aria-pressed="false" aria-label="Retrigger: restart from the top on every arrow key" title="Retrigger: every arrow key restarts the sample from the top (O)"><svg><use href="#i-retrig"/></svg></button>
       <canvas class="tp-spec" id="tp-spec" aria-hidden="true"></canvas>
       <label class="tp-auto" title="Play each sample as you move with the arrow keys"><input type="checkbox" id="tp-auto"> Auto-play on arrows</label>
       <div class="tp-vol"><svg aria-hidden="true"><use href="#i-vol"/></svg><input type="range" id="tp-vol" min="0" max="100" value="80" aria-label="Volume"></div>
@@ -337,11 +397,14 @@
       <dt><kbd>Enter</kbd></dt><dd>Play from start</dd>
       <dt><kbd>L</kbd></dt><dd>Loop on / off</dd>
       <dt><kbd>A</kbd></dt><dd>Auto-play on arrows</dd>
+      <dt><kbd>O</kbd></dt><dd>Retrigger: every arrow key restarts from the top</dd>
+      <dt>Drag a row</dt><dd>Drop the file into your DAW or Explorer</dd>
       <dt><kbd>Ctrl</kbd>+<kbd>A</kbd></dt><dd>Select all results</dd>
       <dt><kbd>Ctrl</kbd>/<kbd>Shift</kbd>+click</dt><dd>Add to / extend selection</dd>
       <dt><kbd>E</kbd></dt><dd>Edit selection</dd>
       <dt><kbd>Esc</kbd></dt><dd>Clear selection, close panels</dd>
     </dl>
+    <p class="keys-ver" id="keys-ver">Sample Library Organizer <span class="mono" id="app-version"></span></p>
     <div class="dlg-actions"><button class="btn">Close</button></div>
   </form>
 </dialog>
@@ -353,6 +416,12 @@
 <script src="vtable.js"></script>
 <script src="library.js"></script>
 <script src="review.js"></script>
+<script src="starter.js"></script>
+<script src="media.js"></script>
+<script src="collections.js"></script>
+<script src="undo.js"></script>
+<script src="findsounds.js"></script>
+<script src="settings.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

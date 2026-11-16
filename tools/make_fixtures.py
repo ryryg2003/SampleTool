@@ -73,6 +73,35 @@ def kick(seed: int = 0, dur: float = 0.25):
     return out
 
 
+_PC = {"C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5, "F#": 6, "G": 7, "G#": 8,
+       "A": 9, "A#": 10, "B": 11}
+
+
+def beat_loop(bpm: float, bars: int, key: str, offset_s: float = 0.0, sr: int = 22050):
+    """Musical loop with known tempo and key: kick on every beat, offbeat hat,
+    sustained triad of ``key`` ("Am", "F#") and a root bass note. ``offset_s``
+    prepends silence (an off-grid trim)."""
+    minor = key.endswith("m")
+    root = _PC[key[:-1] if minor else key]
+    triad = [root, root + (3 if minor else 4), root + 7]
+    freqs = [440.0 * 2 ** ((60 + pc - 69) / 12) for pc in triad]  # C4 octave
+    bass_f = 440.0 * 2 ** ((36 + root - 69) / 12)
+    beat = 60.0 / bpm
+    n = int(round(sr * beat * 4 * bars))
+    rng = random.Random(bars * 1000 + int(bpm))
+    out = []
+    for i in range(n):
+        t = i / sr
+        tb = t % beat
+        th = (t + beat / 2) % beat
+        k = math.sin(2 * math.pi * (50 + 90 * math.exp(-tb * 40)) * tb) * math.exp(-tb * 18)
+        h = (rng.random() * 2 - 1) * math.exp(-th * 60) * 0.25
+        pad = sum(math.sin(2 * math.pi * f * t) for f in freqs) * 0.12
+        bass = math.sin(2 * math.pi * bass_f * t) * 0.15
+        out.append(0.55 * k + h + pad + bass)
+    return [0.0] * int(sr * offset_s) + out
+
+
 def wav_bytes(samples, sr: int = SR, channels: int = 1, extra_chunks: bytes = b"") -> bytes:
     """16-bit PCM WAV via the ``wave`` module, optional extra RIFF chunks appended."""
     buf = io.BytesIO()

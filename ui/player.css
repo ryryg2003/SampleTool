@@ -50,14 +50,26 @@
 .tp-time, .tp-dur { flex: none; font-size: 12.5px; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
 .tp-time { color: var(--text); min-width: 46px; text-align: right; }
 .tp-dur { color: var(--muted); min-width: 46px; }
-.tp-wave { position: relative; flex: 1 1 auto; min-width: 80px; height: 36px; display: flex; align-items: center; }
-.tp-wave-c { position: absolute; inset: 0; width: 100%; height: 100%; display: none; pointer-events: none; }
-.tp-wave.has-wave .tp-wave-c { display: block; }
-/* The lit copy is revealed up to the playhead. */
-.tp-wave-lit {
-  clip-path: inset(0 calc((1 - var(--playhead)) * 100%) 0 0);
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 45%, transparent));
+/* The deck waveform (media.js Wave: server peaks, click/drag seek). Played part lit
+   in the accent gradient, a glowing playhead, a soft glass well behind it. */
+.tp-wave {
+  position: relative; flex: 1 1 auto; min-width: 80px; height: 36px; border-radius: 10px;
+  background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1px var(--line-soft);
+  cursor: pointer; touch-action: none; overflow: hidden;
 }
+.tp-wave-c { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.tp-wave-ph {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%); max-width: calc(100% - 20px);
+  color: var(--muted); font-size: 11.5px; line-height: 16px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+}
+.tp-wave:not(.is-empty) .tp-wave-ph { display: none; }
+.tp-wave[data-state="loading"] .tp-wave-ph { color: var(--text); }
+.tp-wave[data-state="empty"] { cursor: default; }
+/* The range input stays focusable and keyboard-operable but invisible; pointer input
+   is handled by the wave strip. */
+.tp-wave .scrub { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
+.tp-wave:has(.scrub:focus-visible) { box-shadow: var(--focus); }
 
 /* Fallback (no peaks): a gradient pill track. */
 .scrub { --p: 0%; position: relative; -webkit-appearance: none; appearance: none; width: 100%; height: 14px; background: transparent; margin: 0; cursor: pointer; }
@@ -69,16 +81,6 @@
 .scrub:disabled::-webkit-slider-thumb { background: #6d6590; box-shadow: none; }
 .scrub:disabled::-moz-range-thumb { background: #6d6590; box-shadow: none; }
 .scrub:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 999px; }
-
-/* With peaks: the canvases are the track; the thumb becomes a playhead line. */
-.tp-wave.has-wave .scrub { height: 100%; }
-.tp-wave.has-wave .scrub::-webkit-slider-runnable-track { height: 36px; background: transparent; }
-.tp-wave.has-wave .scrub::-moz-range-track { height: 36px; background: transparent; }
-.tp-wave.has-wave .scrub::-webkit-slider-thumb { width: 3px; height: 32px; margin-top: 2px; border-radius: 2px; box-shadow: 0 0 8px var(--accent), 0 0 2px #fff; }
-.tp-wave.has-wave .scrub::-moz-range-thumb { width: 3px; height: 32px; border-radius: 2px; box-shadow: 0 0 8px var(--accent), 0 0 2px #fff; }
-.tp-wave.has-wave .scrub:disabled::-webkit-slider-thumb { background: rgba(246, 239, 255, .35); box-shadow: none; }
-.tp-wave.has-wave .scrub:disabled::-moz-range-thumb { background: rgba(246, 239, 255, .35); box-shadow: none; }
-.tp-wave.has-wave .scrub:focus-visible { border-radius: 10px; }
 
 /* ---------- Loop ---------- */
 .tp-toggle { width: 36px; height: 36px; background: none; border-color: transparent; color: var(--muted); }

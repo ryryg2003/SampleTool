@@ -982,6 +982,29 @@ class ResumeTest(E2ECase):
         self.assert_final_state(plan, list(res.values()))
 
 
+class MixMatchingApiTest(E2ECase):
+    def test_matches_starter_and_saved_sets(self):
+        self.env.scan()
+        rows = self.env.get("/api/samples", limit=1000)["items"]
+        loop = next(r for r in rows if r["loop_type"] == "loop")
+        res = self.env.get("/api/samples/%s/matches" % loop["id"])
+        self.assertIsInstance(res["items"], list)
+        self.assertTrue(all(m["row"]["id"] != loop["id"] for m in res["items"]))
+        code, _, _ = self.env.raw("GET", "/api/samples/nope/matches")
+        self.assertEqual(code, 404)
+        code, _, _ = self.env.raw("GET", "/api/samples/%s/matches" % loop["id"], q={"role": "x"})
+        self.assertEqual(code, 400)
+        _, st = self.env.post("/api/starter", {"seed": 5})
+        self.assertEqual(set(st["slots"]), {"drums", "bass", "melody"})
+        _, saved = self.env.post("/api/starters", {"name": "A", "key": st["key"], "bpm": st["bpm"],
+                                                   "ids": [loop["id"]]})
+        self.assertEqual(self.env.get("/api/starters")["items"][0]["id"], saved["starter"]["id"])
+        code, _, _ = self.env.raw("DELETE", "/api/starters/" + saved["starter"]["id"],
+                                  headers={"X-SLO": "1"})
+        self.assertEqual(code, 200)
+        self.assertEqual(self.env.get("/api/starters")["items"], [])
+
+
 class PersistenceTest(E2ECase):
     def test_restart_reloads_everything(self):
         env, m = self.env, self.m

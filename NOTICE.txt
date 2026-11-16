@@ -1,0 +1,14 @@
+Sample Library Organizer
+Copyright (c) 2026 the Sample Library Organizer author. All rights reserved.
+
+This program uses only the Python standard library and plain HTML, CSS and
+JavaScript. It contains no third-party code and needs no internet connection.
+
+Sounds downloaded with the optional Find Sounds (Freesound) feature belong
+to their uploaders and keep their own Creative Commons licenses. Each download
+is saved with a .license.txt file next to it that names the author, the
+license and the source page. Keep those files: Attribution sounds must be
+credited when you release music that uses them.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. Keep a backup
+of your sample collection.
