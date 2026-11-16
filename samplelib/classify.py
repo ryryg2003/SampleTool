@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import functools
 import re
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 from . import analysis, audio_meta
 from .models import CATEGORIES, META_KEYS, field

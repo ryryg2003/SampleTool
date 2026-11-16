@@ -22,7 +22,7 @@ import time
 
 from . import inventory
 from .winfs import (IS_WINDOWS, file_identity, is_locked_error, is_reparse_point,
-                    is_within, long_path, name_key, nearest_existing, path_key,
+                    is_within, long_path, name_key, path_key,
                     same_volume)
 
 WRITE_ACTIONS = ("move", "link")

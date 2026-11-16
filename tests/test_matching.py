@@ -93,6 +93,13 @@ class MatchesTest(MatchingBase):
         n = self.names(matching.matches(self.st, self.src, role="bass"))
         self.assertIn("808 A", n)
 
+    def test_fast_score_matches_explained_score(self):
+        feats = list(matching.features(self.st).values())
+        for a in feats:
+            for b in feats:
+                self.assertAlmostEqual(matching._fast_score(a, b), matching.score_pair(a, b)[0],
+                                       places=9, msg=(a.it["name"], b.it["name"]))
+
     def test_unknown_id(self):
         with self.assertRaises(KeyError):
             matching.matches(self.st, "nope")

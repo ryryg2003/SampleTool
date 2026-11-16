@@ -1,6 +1,6 @@
 # Add-on research: search free sample sources from inside the app
 
-Status: research and proposal only. Nothing here is built yet.
+Status: **shelved** (November 2026). Research only; nothing here is built.
 
 ## Recommendation
 

@@ -46,6 +46,27 @@ the `.bat` file, or change the folder on the Scan screen.
 App state (scan cache, edits, plan, approval, journal) lives in
 `%LOCALAPPDATA%\SampleOrganizer`, never in your sample folders.
 
+## Finding samples that go together
+
+- **Measured tempo and key.** During the scan, WAV and AIFF loops get their BPM,
+  key, length in bars and downbeat measured from the audio (first 30 seconds).
+  Bass and melodic one-shots get their root note. A measured value only fills a
+  gap: tags, filenames, folders and your own edits always win. When the audio
+  disagrees with a label you see a warning such as
+  "Filename says 140 BPM, audio measures 128". Measured values have a dotted
+  underline in the table and an **Analysis** badge in the side panel. Results
+  are cached by file hash, so a rescan only measures new or changed files.
+  MP3, FLAC and OGG keep their tag and filename values.
+- **Goes well with.** Select any sample. The side panel ranks samples that mix
+  with it: same tempo (half and double time count), same or relative key or a
+  neighbor on the Camelot wheel, loop lengths that line up, both on the
+  downbeat, same pack or kit. Filter by Drums, Bass, Melody or Vocal & FX. Each
+  suggestion says why it matched. Duplicates are never suggested.
+- **Beat Starter** (the Starter tab). Pick a key and tempo, or leave them
+  random, and get a drum loop, bass and melody that fit. Lock the parts you
+  like, reroll the others, **Play all** to hear them together in sync, and
+  save sets you want to come back to. Saved sets live in the app data folder.
+
 ## Safety model
 
 - Nothing is overwritten. Destination checks are case-insensitive.
@@ -60,7 +81,7 @@ App state (scan cache, edits, plan, approval, journal) lives in
 
 ## Tests
 
-`run_tests.bat` (Windows) or `python tests/run_all.py` runs 89 unit,
+`run_tests.bat` (Windows) or `python tests/run_all.py` runs 118 unit,
 end-to-end and Windows/NTFS tests against disposable synthetic fixtures.
 Every push runs them on GitHub Actions on Windows and Linux (Python 3.10 and
 3.13), plus the UI smoke test and a full scan-to-run flow through the UI in
@@ -79,7 +100,13 @@ are attached to the workflow as artifacts.
 - A flat folder holding several kits as loose files is not split into kits
   automatically; use **Create kit** from selected samples.
 
-## Roadmap
+- Tempo and key are measured only for uncompressed WAV and AIFF. Tempo assumes
+  4/4 and 60 to 200 BPM; treat measured values as estimates.
+- **Play all** in Beat Starter plays loops at their own speed. Loops with
+  different tempos are not stretched to match, so Beat Starter picks matching
+  tempos.
 
-`docs/FREE_SOUNDS_ADDON.md`: research and proposal for searching Freesound
-(CC0-licensed sounds) from inside the app.
+## Shelved
+
+`docs/FREE_SOUNDS_ADDON.md`: research on searching Freesound from inside the
+app. Shelved in November 2026; kept for reference.
