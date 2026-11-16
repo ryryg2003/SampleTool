@@ -1,6 +1,6 @@
 # v1.0 work checkpoint
 
-Status as of 2026-11-16: **paused before any feature code was written.** This
+Status as of 2026-11-16: **scaffold committed (6a162b4); five feature agents A-E running in worktrees.** If this session ends before they report, re-run each agent's task on top of the scaffold commit (prompts mirror the table below). This
 file lets a new session resume without re-reading everything. Delete it when
 v1.0.0 ships.
 
