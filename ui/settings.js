@@ -279,11 +279,14 @@ const Settings = {
   /* ---------- Freesound key (endpoints owned by the Freesound add-on) ---------- */
   async loadFreesound() {
     const box = $('#set-fs');
+    const na = '<p class="dim" id="set-fs-na">Freesound add-on not available in this version.</p>';
+    // Without the add-on's view there is no server route either; skip the request (a 404 logs a console error).
+    if (!App.views.find) { box.innerHTML = na; return; }
     let s;
     try { s = await API.get('/api/freesound/status'); }
     catch (e) {
       box.innerHTML = e.status === 404
-        ? '<p class="dim" id="set-fs-na">Freesound add-on not available in this version.</p>'
+        ? na
         : `<p class="err">Could not check Freesound: ${esc(e.message)}</p>`;
       return;
     }
