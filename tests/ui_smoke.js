@@ -397,6 +397,65 @@ function url(hash) {
     //
     //
     // >>> findsounds checks (owned by the findsounds feature; insert between these lines)
+    {
+      // ---------- Find Sounds ----------
+      await page.click('.rail-btn[data-view="find"]');
+      await page.waitForSelector('#find-h', { timeout: 5000 });
+      await settle(400);
+      check('find: view renders', /Find Sounds/.test(await page.textContent('#find-h')));
+      if (fixture) {
+        check('find: no-key state offers inline key and settings link', await page.isVisible('#fs-key-in') && (await page.locator('#fs-to-settings').count()) === 1);
+        await shot('11-find-nokey');
+        await page.fill('#fs-key-in', 'fixturekey123456');
+        await page.click('#fs-keyform button[type=submit]');
+        await page.waitForSelector('#fs-q', { state: 'visible' });
+        await settle(300);
+        check('find: CC0 chip on by default', (await page.getAttribute('#fs-cc0', 'aria-pressed')) === 'true');
+        check('find: attribution off by default', (await page.getAttribute('#fs-attr', 'aria-pressed')) === 'false');
+        check('find: NonCommercial never offered', (await page.locator('#view-find button:has-text("NonCommercial"), #view-find input[value*="NonCommercial" i]').count()) === 0 && /never shown/.test(await page.textContent('.fs-nc')));
+        check('find: quota visible', /\d+ \/ 2,000/.test(await page.textContent('#fs-quota')));
+        await page.fill('#fs-q', 'kick');
+        await page.press('#fs-q', 'Enter');
+        await page.waitForSelector('#fs-results .fs-list .fs-row', { timeout: 5000 });
+        const n0 = await page.locator('#fs-results .fs-list .fs-row').count();
+        check('find: search renders results', n0 > 0, `rows=${n0}`);
+        check('find: only CC0 badges by default', (await page.locator('#fs-results .fs-badge.fs-by').count()) === 0 && (await page.locator('#fs-results .fs-badge.fs-cc0').count()) === n0);
+        check('find: Open on Freesound opens a new tab', (await page.getAttribute('#fs-results .fs-row a.btn', 'target')) === '_blank');
+        check('find: quota counts the search', /1 \/ 2,000/.test(await page.textContent('#fs-quota')));
+        await page.fill('#fs-q', '');
+        await page.click('#fs-attr');
+        await page.waitForSelector('#fs-results .fs-badge.fs-by', { timeout: 5000 });
+        check('find: attribution toggle adds CC BY results', (await page.getAttribute('#fs-attr', 'aria-pressed')) === 'true');
+        await page.waitForSelector('#fs-pager:not([hidden])', { timeout: 5000 });
+        await page.click('#fs-next');
+        await settle(400);
+        check('find: next page', /Page 2 of/.test(await page.textContent('#fs-page')));
+        await page.click('#fs-results .fs-row [data-act="dl"]');
+        await page.waitForSelector('#fs-results .fs-saved', { timeout: 5000 });
+        check('find: download marks row saved', (await page.locator('#fs-results .fs-saved').count()) === 1);
+        check('find: preview fallback labelled lower quality', /lower quality/.test(await page.textContent('#fs-side')));
+        check('find: no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        await shot('12-find-results');
+        await page.setViewportSize({ width: 1920, height: 1080 });
+        await settle(300);
+        await shot('12b-find-results-1080');
+        check('find: no horizontal overflow at 1920', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        await page.setViewportSize({ width: 1366, height: 768 });
+        await page.fill('#fs-q', 'ratelimit');
+        await page.press('#fs-q', 'Enter');
+        await page.waitForSelector('.fs-b-wait', { timeout: 5000 });
+        check('find: rate-limited banner shows wait', /try again in \d+ s/i.test(await page.textContent('#fs-banner')));
+        await shot('13-find-ratelimited');
+        await page.fill('#fs-q', 'offline');
+        await page.press('#fs-q', 'Enter');
+        await page.waitForSelector('.fs-b-off', { timeout: 5000 });
+        check('find: offline banner', /Offline/.test(await page.textContent('#fs-banner')));
+        await page.fill('#fs-q', '');
+      } else {
+        check('find: shows key form or search box', await page.isVisible('#fs-key-in') || await page.isVisible('#fs-q'));
+        await shot('11-find');
+      }
+    }
     // <<< findsounds checks
     //
     //
