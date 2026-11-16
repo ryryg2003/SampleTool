@@ -78,6 +78,14 @@ function url(hash) {
     check('library loads rows', total0 > 0, `count=${total0}`);
     check('no horizontal page overflow (library)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     check('nav always visible', (await page.locator('.rail-btn').count()) === 6);
+    for (const [ft, label] of [['key_compat', 'Compatible keys'], ['bpm_half', 'Half/double'], ['verified', 'Verified only']]) {
+      const b = `#lib-filters [data-ft="${ft}"]`;
+      await page.click(b); await settle();
+      const on = (await page.getAttribute(b, 'aria-pressed')) === 'true';
+      const chip = (await page.textContent('#lib-chips')).includes(label);
+      await page.click(b); await settle();
+      check(`filter toggle ${ft} sets and clears`, on && chip && (await page.getAttribute(b, 'aria-pressed')) === 'false');
+    }
     await shot('01-library');
 
     // search (debounced)
@@ -296,6 +304,8 @@ function url(hash) {
     await page.waitForSelector('#bs-slots .bs-slot', { timeout: 10000 });
     check('beat starter shows 3 slots', (await page.locator('#bs-slots .bs-slot').count()) === 3);
     check('no horizontal page overflow (starter)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    check('starter: genre picker lists library genres', (await page.locator('#bs-genre option').count()) > 1);
+    check('starter: Loose toggle off by default', !(await page.isChecked('#bs-loose')));
     const filled = async (slot) => (await page.locator(`#bs-slots .bs-slot[data-slot="${slot}"]:not(.bs-empty)`).count()) === 1;
     if (fixture && await filled('drums') && await filled('melody')) {
       const nm = async (slot) => page.textContent(`#bs-slots .bs-slot[data-slot="${slot}"] .bs-name`);

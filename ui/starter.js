@@ -17,8 +17,16 @@ const Starter = {
     $('#bs-playall').onclick = () => this.togglePlayAll();
     $('#bs-save').onclick = () => this.save();
     $('#bs-loose').onchange = () => this.roll();
+    $('#bs-genre').onchange = () => { this.locks = {}; this.roll(); };
+    App.on('facets', (f) => this.fillGenres(f.genres || []));
+  },
+  fillGenres(genres) {
+    const el = $('#bs-genre'), cur = el.value;
+    el.innerHTML = '<option value="">Any genre</option>' + genres.map((g) => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
+    el.value = genres.includes(cur) ? cur : '';
   },
   show() {
+    if ($('#bs-genre').options.length < 2) API.get('/api/facets').then((f) => this.fillGenres(f.genres || [])).catch(() => {});
     if (!this.res) this.roll();
     this.loadSaved();
   },
@@ -42,7 +50,7 @@ const Starter = {
       for (const s of Object.keys(this.locks)) if (this.locks[s] && cur[s]) locked[s] = cur[s];
     }
     try {
-      this.res = await API.post('/api/starter', { key, bpm, locked, avoid, loose: $('#bs-loose').checked });
+      this.res = await API.post('/api/starter', { key, bpm, locked, avoid, loose: $('#bs-loose').checked, genre: $('#bs-genre').value || null });
     } catch (e) { toast(e.message, 'err'); return; }
     this.render();
   },

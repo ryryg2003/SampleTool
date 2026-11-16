@@ -531,6 +531,38 @@ class Store:
             self._hay[it["id"]] = h
         return h
 
+    VERIFIED_SOURCES = {"tag", "filename", "folder", "pack", "manual"}
+
+    def _verified(self, it: dict, eq: dict, want_key, bmin, bmax) -> bool:
+        """True when the values the filters rely on are not guesses: they come
+        from tags, names, folders or your edits (or a confident measurement),
+        and the audio does not contradict them. With no BPM/key/genre filter,
+        every BPM and key the sample has must pass."""
+        fields = []
+        if bmin is not None or bmax is not None:
+            fields.append("bpm")
+        if want_key is not None or "key" in eq:
+            fields.append("key")
+        if "genre" in eq:
+            fields.append("genre")
+        if not fields:
+            fields = [k for k in ("bpm", "key") if self._mv(it, k) is not None]
+        meta = it.get("meta") or {}
+        for k in fields:
+            f = meta.get(k) or {}
+            src, conf = f.get("source"), f.get("confidence")
+            if f.get("value") is None:
+                return False
+            if src in self.VERIFIED_SOURCES:
+                continue
+            if src == "analysis" and k != "genre" and (conf or 0) >= 0.7:
+                continue
+            return False
+        warns = it.get("warnings") or []
+        if any("audio measures" in w for w in warns):
+            return False
+        return True
+
     def query(self, q: dict) -> tuple[int, list]:
         """Filter + sort. q: dict of single string values."""
         g = lambda k: (q.get(k) or "").strip()
@@ -545,6 +577,12 @@ class Store:
         except ValueError:
             bmin = bmax = None
         only_new = g("new") in ("1", "true", "yes")
+        yes = lambda k: g(k) in ("1", "true", "yes")
+        key_compat, bpm_half, verified = yes("key_compat"), yes("bpm_half"), yes("verified")
+        if key_compat and eq.get("key"):
+            want_key = eq.pop("key")
+        else:
+            want_key = None
         hashsets = []   # each must contain the item's sha256
         if g("fav") in ("1", "true", "yes"):
             hashsets.append(self.collections.hashes("fav"))
@@ -598,10 +636,20 @@ class Store:
                         break
                 if not ok:
                     continue
+                if want_key is not None:
+                    from .matching import key_ok
+                    if not key_ok(want_key, self._mv(it, "key"))[0]:
+                        continue
                 if bmin is not None or bmax is not None:
                     b = self._mv(it, "bpm")
-                    if b is None or (bmin is not None and b < bmin) or (bmax is not None and b > bmax):
+                    if b is None:
                         continue
+                    cands = (b, b * 2, b / 2) if bpm_half else (b,)
+                    if not any((bmin is None or c >= bmin) and (bmax is None or c <= bmax)
+                               for c in cands):
+                        continue
+                if verified and not self._verified(it, eq, want_key, bmin, bmax):
+                    continue
                 out.append(it)
             sort = g("sort") or "name"
             rev = g("dir") == "desc"

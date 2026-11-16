@@ -205,6 +205,9 @@
             <select class="input" data-f="genre" aria-label="Genre"><option value="">Genre</option></select>
             <select class="input" data-f="manufacturer" aria-label="Manufacturer"><option value="">Maker</option></select>
             <span class="bpm-range"><input class="input mono" data-f="bpm_min" type="number" min="0" max="999" placeholder="BPM" aria-label="Minimum BPM"><span aria-hidden="true">–</span><input class="input mono" data-f="bpm_max" type="number" min="0" max="999" placeholder="max" aria-label="Maximum BPM"></span>
+            <button type="button" class="fbtn" data-ft="key_compat" aria-pressed="false" title="With a key picked, also show its relative major/minor (for example Am with C)">Compatible keys</button>
+            <button type="button" class="fbtn" data-ft="bpm_half" aria-pressed="false" title="With a BPM range, also match loops at half or double that tempo">Include half/double</button>
+            <button type="button" class="fbtn" data-ft="verified" aria-pressed="false" title="Only samples whose BPM, key and genre come from tags, names, folders or your edits, with no audio disagreement">Verified only</button>
             <button type="button" class="fbtn" id="lib-new" aria-pressed="false" title="Files that arrived after the last approved run (or the first scan)">New since last run <b class="mono" id="lib-new-n"></b></button>
             <select class="input" data-f="status" aria-label="Review status"><option value="">Status</option><option value="ok">OK</option><option value="needs-review">Needs review</option><option value="edited">Edited</option><option value="held">Held</option><option value="excluded">Excluded</option><option value="done">Organized</option></select>
           </div>
@@ -237,6 +240,7 @@
       <header class="bs-head head-card vh-card">
         <div class="vh-text"><span class="vh-eyebrow">Beat Starter</span><h1 id="bs-h">Beat Starter</h1><p class="dim">A drum loop, bass and melody that fit together. Lock what you like, reroll the rest.</p></div>
         <div class="bs-ctl">
+          <select class="input" id="bs-genre" aria-label="Genre" title="Prefer loops of this genre; other genres fill in when none fit"><option value="">Any genre</option></select>
           <select class="input" id="bs-key" aria-label="Key"></select>
           <input class="input mono" id="bs-bpm" type="number" min="60" max="200" placeholder="Any BPM" aria-label="Tempo in BPM">
           <label class="check check-sm" title="Loose also allows neighbor keys and tempos a few percent apart. Off: only exact matches."><input type="checkbox" id="bs-loose"> Loose</label>

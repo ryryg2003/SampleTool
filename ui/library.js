@@ -4,8 +4,9 @@
 
 const CATEGORY_LIST = ['One-Shots/Drums', 'One-Shots/Bass & 808s', 'One-Shots/Instruments', 'One-Shots/FX & Vocals',
   'Loops/Drum Loops', 'Loops/Melody Loops', 'Loops/Bass Loops', 'Loops/Vocal & FX Loops', 'Presets & MIDI', 'Unsorted'];
-const FILTER_LABEL = { category: 'Category', instrument: 'Instrument', loop_type: 'Type', key: 'Key', genre: 'Genre', manufacturer: 'Maker', bpm_min: 'BPM ≥', bpm_max: 'BPM ≤', status: 'Status', pack: 'Pack', q: 'Search', coll: 'Collection', new: 'New' };
-const FILTER_KEYS = ['category', 'instrument', 'loop_type', 'key', 'genre', 'manufacturer', 'bpm_min', 'bpm_max', 'status'];
+const FILTER_LABEL = { key_compat: 'Key', bpm_half: 'BPM', verified: 'Only', category: 'Category', instrument: 'Instrument', loop_type: 'Type', key: 'Key', genre: 'Genre', manufacturer: 'Maker', bpm_min: 'BPM ≥', bpm_max: 'BPM ≤', status: 'Status', pack: 'Pack', q: 'Search', coll: 'Collection', new: 'New' };
+const FILTER_KEYS = ['category', 'instrument', 'loop_type', 'key', 'genre', 'manufacturer', 'bpm_min', 'bpm_max', 'status', 'key_compat', 'bpm_half', 'verified'];
+const TOGGLE_FILTERS = { key_compat: 'Compatible keys', bpm_half: 'Half/double', verified: 'Verified only' };
 const NO_HASH_TIP = 'Can’t star or collect: this file could not be fingerprinted (SHA-256 failed)';
 function starTip(r) {
   if (!r.sha256) return NO_HASH_TIP;
@@ -121,6 +122,11 @@ const Library = {
       const h = () => { const v = el.value.trim(); if (v) this.filters[el.dataset.f] = v; else delete this.filters[el.dataset.f]; this.apply(); };
       el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', el.tagName === 'SELECT' ? h : debounce(h, 300));
     });
+    $$('#lib-filters [data-ft]').forEach((b) => b.addEventListener('click', () => {
+      const k = b.dataset.ft;
+      if (this.filters[k]) delete this.filters[k]; else this.filters[k] = '1';
+      this.apply();
+    }));
     $('#lib-clear').addEventListener('click', () => this.clearAll());
     $('#lib-allfiles').checked = this.allFiles;
     $('#lib-allfiles').addEventListener('change', () => { this.allFiles = $('#lib-allfiles').checked; Store.set('lib.allFiles', this.allFiles); this.apply(); });
@@ -245,7 +251,7 @@ const Library = {
     if (this.coll) chips.push(['coll', this.coll.name]);
     if (this.newOnly) chips.push(['new', 'since last run']);
     if (this.q) chips.push(['q', '“' + this.q + '”']);
-    for (const [k, v] of Object.entries(this.filters)) chips.push([k, k === 'category' ? Fmt.catShort(v) : k === 'status' ? STATUS_LABEL[v] || v : v]);
+    for (const [k, v] of Object.entries(this.filters)) chips.push([k, TOGGLE_FILTERS[k] ? TOGGLE_FILTERS[k] : k === 'category' ? Fmt.catShort(v) : k === 'status' ? STATUS_LABEL[v] || v : v]);
     $('#lib-chips').innerHTML = chips.map(([k, v]) => `<span class="chip"><span class="chip-k">${esc(FILTER_LABEL[k] || k)}</span> <span class="chip-v ellip">${esc(v)}</span><button type="button" class="chip-x" data-k="${k}" aria-label="Remove filter ${esc(FILTER_LABEL[k] || k)} ${esc(v)}"><svg><use href="#i-x"/></svg></button></span>`).join('');
     $$('#lib-chips .chip-x').forEach((b) => b.addEventListener('click', () => {
       const k = b.dataset.k;
@@ -260,6 +266,7 @@ const Library = {
     const nb = $('#lib-new'); nb.setAttribute('aria-pressed', this.newOnly ? 'true' : 'false'); nb.classList.toggle('is-set', this.newOnly);
     App.emit('lib-filters', this.params());
     $$('#lib-filters [data-f]').forEach((el) => el.classList.toggle('is-set', !!this.filters[el.dataset.f]));
+    $$('#lib-filters [data-ft]').forEach((b) => b.setAttribute('aria-pressed', String(!!this.filters[b.dataset.ft])));
     this.renderStats();
   },
 
