@@ -13,6 +13,10 @@ function provBadge(p) {
   const title = `${SOURCE_LABEL[p.source] || p.source}${c !== null && c !== undefined ? ', ' + Fmt.pct(c) + ' confidence' : ''}`;
   return `<span class="prov prov-${esc(p.source)} conf-${lvl}" title="${esc(title)}">${esc(SOURCE_LABEL[p.source] || p.source)}${c !== null && c !== undefined ? `<b class="mono">${Fmt.pct(c)}</b>` : ''}</span>`;
 }
+function estMark(r, k, text) {
+  const est = text !== '' && r.prov && r.prov[k] && r.prov[k].source === 'analysis';
+  return est ? `<span class="est" title="Measured from the audio (estimate)">${esc(text)}</span>` : esc(text);
+}
 function statusBadge(s) { return s ? `<span class="st st-${esc(s)}">${esc(STATUS_LABEL[s] || s)}</span>` : ''; }
 function extBadge(row) { return `<span class="ext${row.preview === 'unsupported' ? ' ext-np' : ''}" title="${row.preview === 'unsupported' ? 'Browser cannot preview this format' : esc(row.ext)}">${esc((row.ext || '').replace('.', ''))}</span>`; }
 
@@ -41,8 +45,9 @@ const Library = {
         { key: 'name', label: 'Name', sort: 'name', width: 'minmax(150px, 2.2fr)', cls: 'c-name', title: (r) => r.abs_path, render: (r) => `<span class="nm ellip">${esc(r.name)}</span>${extBadge(r)}${r.kit_name ? `<span class="kitmark" title="Part of kit ${esc(r.kit_name)}">kit</span>` : ''}${r.dup_count > 1 ? `<span class="dupmark mono" title="${r.dup_count} identical copies">×${r.dup_count}</span>` : ''}` },
         { key: 'pack', label: 'Pack', sort: 'pack', width: 'minmax(90px, 1.1fr)', cls: 'c-pack', title: (r) => r.pack || '', render: (r) => `<span class="ellip">${esc(r.pack ? shortPack(r.pack, r.manufacturer) : (r.origin === 'library' ? 'In library' : '—'))}</span>` },
         { key: 'inst', label: 'Instrument', width: 'minmax(64px, .55fr)', cls: 'c-inst', title: (r) => r.category || '', render: (r) => `<span class="ellip">${esc(r.instrument || Fmt.catShort(r.category) || '—')}</span>` },
-        { key: 'bpm', label: 'BPM', sort: 'bpm', width: '46px', cls: 'num', render: (r) => esc(Fmt.bpm(r.bpm)) },
-        { key: 'key', label: 'Key', sort: 'key', width: '42px', cls: 'c-key', render: (r) => esc(r.key || '') },
+        { key: 'bpm', label: 'BPM', sort: 'bpm', width: '46px', cls: 'num', render: (r) => estMark(r, 'bpm', Fmt.bpm(r.bpm)) },
+        { key: 'key', label: 'Key', sort: 'key', width: '42px', cls: 'c-key', render: (r) => estMark(r, 'key', r.key || '') },
+        { key: 'bars', label: 'Bars', width: '40px', cls: 'num', render: (r) => r.bars ? `${esc(r.bars)}${r.on_grid === false ? '<span class="offgrid" title="Starts late: not on the downbeat">◂</span>' : ''}` : '' },
         { key: 'dur', label: 'Length', sort: 'duration', width: '54px', cls: 'num', render: (r) => r.duration_s ? Fmt.dur(r.duration_s) : '' },
         { key: 'size', label: 'Size', sort: 'size', width: '60px', cls: 'num', render: (r) => Fmt.bytes(r.size) },
         { key: 'st', label: 'Status', sort: 'status', width: '76px', cls: 'c-st', render: (r) => statusBadge(r.review_status) },
@@ -307,13 +312,45 @@ const Library = {
   async inspect(row) {
     this.current = row;
     this.detail = null;
+    this.matches = null;
+    this.matchErr = null;
     this.renderInspector();
+    this.loadMatches(row.id);
     try {
       const d = await API.get('/api/samples/' + encodeURIComponent(row.id));
       if (this.current && this.current.id === row.id) { this.detail = d; this.renderInspector(); }
     } catch (e) {
       if (this.current && this.current.id === row.id) { this.detailErr = e.message; this.renderInspector(); }
     }
+  },
+  async loadMatches(id) {
+    if (!this.current || this.current.kind !== 'audio') return;
+    try {
+      const r = await API.get('/api/samples/' + encodeURIComponent(id) + '/matches', { role: this.matchRole || '', limit: 25 });
+      if (this.current && this.current.id === id) { this.matches = r.items; this.renderInspector(); }
+    } catch (e) {
+      if (this.current && this.current.id === id) { this.matches = []; this.matchErr = e.message; this.renderInspector(); }
+    }
+  },
+  matchesHtml(d) {
+    if (d.kind !== 'audio') return '';
+    const role = this.matchRole || '';
+    const roles = [['', 'All'], ['drums', 'Drums'], ['bass', 'Bass'], ['melody', 'Melody'], ['vocal-fx', 'Vocal & FX']];
+    const chips = roles.map(([v, l]) => `<button type="button" class="mchip${role === v ? ' on' : ''}" data-role="${v}" aria-pressed="${role === v}">${l}</button>`).join('');
+    let body;
+    if (this.matches === null) body = '<p class="dim small">Finding matches…</p>';
+    else if (!this.matches.length) body = `<p class="dim small">${esc(this.matchErr || 'No good matches yet. A sample needs a category, plus a tempo or key, to be matched.')}</p>`;
+    else body = `<ol class="mlist">${this.matches.map((m, i) => `<li class="mrow">
+        <button type="button" class="ib mplay" data-i="${i}" aria-label="Play ${esc(m.row.name)}"><svg><use href="#i-${Player.isPlaying(m.row.id) ? 'stop' : 'play'}"/></svg></button>
+        <button type="button" class="mname" data-i="${i}" title="Open ${esc(m.row.name)}"><span class="ellip">${esc(m.row.name)}</span><span class="dim mono small ellip">${esc([Fmt.catShort(m.row.category), m.row.bpm && Fmt.bpm(m.row.bpm) + ' BPM', m.row.key].filter(Boolean).join(' · '))}</span></button>
+        <span class="mscore" title="Match ${Math.round(m.score * 100)}%"><i style="width:${Math.round(m.score * 100)}%"></i></span>
+        <span class="mwhy">${esc(m.reasons.join(' · '))}</span></li>`).join('')}</ol>`;
+    return `<section class="matches" aria-label="Goes well with"><h3 class="side-h">Goes well with</h3><div class="mchips" role="group" aria-label="Filter matches by role">${chips}</div>${body}</section>`;
+  },
+  bindMatches() {
+    $$('#inspector .mchip').forEach((b) => { b.onclick = () => { this.matchRole = b.dataset.role; this.matches = null; this.renderInspector(); this.loadMatches(this.current.id); }; });
+    $$('#inspector .mplay').forEach((b) => { b.onclick = () => { Player.toggle(this.matches[+b.dataset.i].row); this.renderInspector(); }; });
+    $$('#inspector .mname').forEach((b) => { b.onclick = () => this.inspect(this.matches[+b.dataset.i].row); });
   },
   renderInspector() {
     const box = $('#inspector');
@@ -372,6 +409,7 @@ const Library = {
           ${field('genre', 'Genre')}
           ${field('tags', 'Tags', (v) => Array.isArray(v) ? v.join(', ') : v)}
           ${field('manufacturer', 'Maker')}
+          ${d.bars ? `<tr><th scope="row">Bars</th><td>${esc(d.bars)}${d.on_grid === false ? ` <span class="dim">· starts ${esc(Math.round(d.downbeat_ms || 0))} ms late</span>` : d.on_grid ? ' <span class="dim">· on the downbeat</span>' : ''}</td><td><span class="prov prov-analysis">Analysis</span></td></tr>` : ''}
         </tbody></table>
         ${!this.detail && !this.detailErr ? '<p class="dim small">Loading details…</p>' : ''}
         <div class="paths">
@@ -381,8 +419,10 @@ const Library = {
         ${d.dup_count > 1 ? `<p class="note">${d.dup_count} identical copies of this file exist. The plan keeps one physical copy.</p>` : ''}
         ${(d.warnings || []).length ? `<ul class="warns">${d.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
         ${this.detail && this.detail.tags_raw && Object.keys(this.detail.tags_raw).length ? `<details class="raw"><summary>Embedded tags</summary><pre class="mono">${esc(JSON.stringify(this.detail.tags_raw, null, 1))}</pre></details>` : ''}
+        ${this.matchesHtml(d)}
         <p class="dim small mono">sha256 ${esc(Fmt.hash8(d.sha256))}…</p>
       </div>`;
+    this.bindMatches();
     $('#ins-play').onclick = () => { Player.toggle(d); this.renderInspector(); };
     $('#ins-edit').onclick = () => this.openBulk();
     $('#ins-copy').onclick = () => copyText(d.abs_path);

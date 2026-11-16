@@ -13,6 +13,7 @@
   <symbol id="i-review" viewBox="0 0 24 24"><path d="M5 6h9M5 11h9M5 16h5M15 16l2.2 2.2L21 14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-library" viewBox="0 0 24 24"><path d="M4 19V5M8 19V5M12 19l0-12M15.5 18.5l-2.5-12 3-.6 2.5 12z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-log" viewBox="0 0 24 24"><path d="M12 7v5l3 2M4 12a8 8 0 1 0 2.3-5.6M4 4v3h3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M5 18V9M9.5 18V5M14 18v-6M18.5 18V8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="18.5" cy="5" r="1.6" fill="currentColor"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></symbol>
   <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1" fill="currentColor"/></symbol>
   <symbol id="i-loop" viewBox="0 0 24 24"><path d="M17 4l3 3-3 3M20 7H8a4 4 0 0 0-4 4M7 20l-3-3 3-3M4 17h12a4 4 0 0 0 4-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -34,6 +35,7 @@
     <button class="rail-btn" data-view="scan" aria-label="Scan"><svg><use href="#i-scan"/></svg><span>Scan</span></button>
     <button class="rail-btn" data-view="review" aria-label="Review"><svg><use href="#i-review"/></svg><span>Review</span><b class="rail-dot" id="rail-review-dot" hidden></b></button>
     <button class="rail-btn" data-view="library" aria-label="Library"><svg><use href="#i-library"/></svg><span>Library</span></button>
+    <button class="rail-btn" data-view="starter" aria-label="Beat Starter"><svg><use href="#i-spark"/></svg><span>Starter</span></button>
     <button class="rail-btn" data-view="log" aria-label="Move Log"><svg><use href="#i-log"/></svg><span>Move Log</span></button>
     <div class="rail-foot">
       <span class="fixture-flag" id="fixture-flag" hidden title="Fake data in memory. Nothing on disk is read or changed.">Fixture data</span>
@@ -188,6 +190,24 @@
       <aside class="inspector" id="inspector" aria-label="Sample details"></aside>
     </section>
 
+    <!-- ============ BEAT STARTER ============ -->
+    <section class="view view-starter" id="view-starter" aria-labelledby="bs-h" hidden>
+      <header class="bs-head">
+        <div><h1 id="bs-h">Beat Starter</h1><p class="dim">A drum loop, bass and melody that fit together. Lock what you like, reroll the rest.</p></div>
+        <div class="bs-ctl">
+          <select class="input" id="bs-key" aria-label="Key"></select>
+          <input class="input mono" id="bs-bpm" type="number" min="60" max="200" placeholder="Any BPM" aria-label="Tempo in BPM">
+          <button class="btn btn-primary" id="bs-new" type="button">New set</button>
+        </div>
+      </header>
+      <div class="bs-bar"><span class="mono" id="bs-target"></span>
+        <button class="btn" id="bs-playall" type="button">Play all</button>
+        <button class="btn btn-ghost" id="bs-save" type="button" disabled>Save set</button></div>
+      <div class="bs-slots" id="bs-slots"></div>
+      <h2 class="side-h">Saved sets</h2>
+      <ul class="bs-saved" id="bs-saved"></ul>
+    </section>
+
     <!-- ============ MOVE LOG ============ -->
     <section class="view view-log" id="view-log" aria-labelledby="log-h" hidden>
       <header class="view-head">
@@ -321,6 +341,7 @@
 <script src="vtable.js"></script>
 <script src="library.js"></script>
 <script src="review.js"></script>
+<script src="starter.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

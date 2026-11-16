@@ -25,12 +25,13 @@ const Shell = {
   go(v) { if (location.hash !== '#' + v) location.hash = v; else this.route(); },
   route() {
     let v = location.hash.replace('#', '');
-    if (!['scan', 'review', 'library', 'log'].includes(v)) v = App.state && !App.state.has_inventory ? 'scan' : 'library';
+    if (!['scan', 'review', 'library', 'starter', 'log'].includes(v)) v = App.state && !App.state.has_inventory ? 'scan' : 'library';
     App.view = v;
     $$('.view').forEach((s) => { s.hidden = s.id !== 'view-' + v; });
     $$('.rail-btn').forEach((b) => { const on = b.dataset.view === v; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-    document.title = { scan: 'Scan', review: 'Review', library: 'Library', log: 'Move Log' }[v] + ' · Sample Library Organizer';
-    ({ scan: Scan, review: Review, library: Library, log: MoveLog })[v].show();
+    document.title = { scan: 'Scan', review: 'Review', library: 'Library', starter: 'Beat Starter', log: 'Move Log' }[v] + ' · Sample Library Organizer';
+    if (v !== 'starter') Starter.stopAll();
+    ({ scan: Scan, review: Review, library: Library, starter: Starter, log: MoveLog })[v].show();
   },
   pollSoon() { clearTimeout(this.pt); this.pt = setTimeout(() => this.poll(), 120); },
   async poll() {
@@ -287,6 +288,7 @@ document.addEventListener('keydown', (ev) => {
   Scan.init();
   Library.init();
   Review.init();
+  Starter.init();
   MoveLog.init();
   App.on('state', (s) => Shell.renderPlanStatus(s));
   await App.refreshState();

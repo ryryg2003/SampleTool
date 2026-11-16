@@ -97,6 +97,7 @@ const API = {
   },
   get(path, params) { return this.request('GET', path + this.qs(params)); },
   post(path, body) { return this.request('POST', path, body); },
+  del(path) { return this.request('DELETE', path); },
   audioUrl(id) { return '/api/audio/' + encodeURIComponent(id); },
 };
 

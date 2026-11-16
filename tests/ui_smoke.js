@@ -58,7 +58,7 @@ function url(hash) {
     const total0 = await countOf('#lib-count');
     check('library loads rows', total0 > 0, `count=${total0}`);
     check('no horizontal page overflow (library)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-    check('nav always visible', (await page.locator('.rail-btn').count()) === 4);
+    check('nav always visible', (await page.locator('.rail-btn').count()) === 5);
     await shot('01-library');
 
     // search (debounced)
@@ -115,6 +115,15 @@ function url(hash) {
     const insName = await page.textContent('#inspector .ins-name').catch(() => '');
     check('inspector follows selection', curName && insName === curName, `${curName} vs ${insName}`);
     check('provenance badges shown', (await page.locator('#inspector .prov').count()) >= 4);
+    // Goes well with: list or an explanation renders; role chips filter it
+    await page.waitForSelector('#inspector .matches .mlist, #inspector .matches p:not(:has-text("Finding"))', { timeout: 5000 });
+    check('goes-well-with section renders', (await page.locator('#inspector .matches').count()) === 1);
+    await page.click('#inspector .mchip[data-role="drums"]');
+    await page.waitForSelector('#inspector .mchip[data-role="drums"].on');
+    await settle(300);
+    check('match role chip applies', (await page.locator('#inspector .mchip.on').getAttribute('data-role')) === 'drums');
+    await page.click('#inspector .mchip[data-role=""]');
+    await settle(300);
     await page.keyboard.press('Space');
     await settle(300);
     const tpMsg = (await page.textContent('#tp-msg')).trim();
@@ -262,6 +271,34 @@ function url(hash) {
     } else {
       check('no-plan empty state', /No plan yet/.test(await page.textContent('#op-table')));
     }
+
+    // ---------- Beat Starter ----------
+    await page.goto(url('starter'));
+    await page.waitForSelector('#bs-slots .bs-slot', { timeout: 10000 });
+    check('beat starter shows 3 slots', (await page.locator('#bs-slots .bs-slot').count()) === 3);
+    check('no horizontal page overflow (starter)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    const filled = async (slot) => (await page.locator(`#bs-slots .bs-slot[data-slot="${slot}"]:not(.bs-empty)`).count()) === 1;
+    if (fixture && await filled('drums') && await filled('melody')) {
+      const nm = async (slot) => page.textContent(`#bs-slots .bs-slot[data-slot="${slot}"] .bs-name`);
+      const drums0 = await nm('drums'), mel0 = await nm('melody');
+      await page.click('#bs-slots .bs-slot[data-slot="drums"] .bs-lock');
+      let changed = false, kept = true;
+      for (let i = 0; i < 8 && !changed; i++) {
+        await page.click('#bs-slots .bs-slot[data-slot="melody"] .bs-reroll');
+        await settle(250);
+        kept = kept && (await nm('drums')) === drums0;
+        changed = (await filled('melody')) && (await nm('melody')) !== mel0;
+      }
+      check('locked drums kept on reroll', kept);
+      check('reroll changes a slot', changed);
+      await page.click('#bs-save');
+      await settle(300);
+      check('saved set listed', (await page.locator('#bs-saved .bs-set').count()) === 1);
+      await page.click('#bs-saved [data-del="0"]');
+      await settle(300);
+      check('saved set deleted', (await page.locator('#bs-saved .bs-set').count()) === 0);
+    }
+    await shot('starter');
 
     // ---------- Move Log ----------
     await page.click('.rail-btn[data-view="log"]');
