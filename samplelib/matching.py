@@ -201,3 +201,68 @@ def matches(store, item_id, role=None, limit=30):
         src = store.by_id[item_id]
         return [{"row": store.row(it), "score": s, "reasons": r}
                 for s, r, it in ranked(store, src, role, limit=max(1, min(200, limit)))]
+
+
+# ------------------------------------------------------------------ Beat Starter
+SLOTS = ("drums", "bass", "melody")
+
+
+def _target(key, bpm):
+    t = F.__new__(F)
+    t.it, t.role, t.loop = None, "target", True
+    t.bpm, t.key = bpm, analysis.norm_key(key)
+    t.bars = t.grid = t.kit = t.pack = None
+    return t
+
+
+def starter(store, key=None, bpm=None, locked=None, seed=None):
+    """Pick a drum loop, bass and melody that fit together.
+
+    Locked slots ({slot: item id}) are kept and set key/tempo when none are
+    given. Same arguments and seed -> same result."""
+    import random
+    if seed is None:
+        seed = random.randrange(1, 1_000_000)
+    rng = random.Random(seed)
+    locked = {k: v for k, v in (locked or {}).items() if k in SLOTS and v}
+    with store.lock:
+        feats = features(store)
+        pools = {r: sorted((f for f in feats.values() if f.loop and f.role == r),
+                           key=lambda f: f.it["id"]) for r in SLOTS}
+        fixed = {slot: feats.get(i) or F(store.by_id[i]) for slot, i in locked.items()}
+        key = analysis.norm_key(key) if key else None
+        if not key:
+            for slot in ("melody", "bass"):
+                if slot in fixed and fixed[slot].key:
+                    key = fixed[slot].key
+                    break
+        if not bpm:
+            bpm = next((f.bpm for f in fixed.values() if f.bpm), None)
+        if not key or not bpm:
+            seeds = [f for f in pools["melody"] + pools["bass"] if f.key and f.bpm
+                     and (not key or analysis.key_compat(f.key, key)[0] >= 0.9)
+                     and (not bpm or _tempo_val(bpm, f.bpm) >= 0.8)]
+            if seeds:
+                pick = rng.choice(seeds)
+                key, bpm = key or pick.key, bpm or pick.bpm
+                if pick.role not in fixed:
+                    fixed[pick.role] = pick
+        target = _target(key, bpm)
+        slots, missing = {}, {}
+        for slot in SLOTS:
+            if slot in fixed:
+                f = fixed[slot]
+            else:
+                scored = sorted(((_fast_score(target, f), f) for f in pools[slot]),
+                                key=lambda t: (-t[0], t[1].it["id"]))
+                good = [f for s, f in scored if s >= 0.75][:8]
+                f = rng.choice(good) if good else None
+            if f is None:
+                slots[slot] = None
+                missing[slot] = "No %s loops fit %s at %s BPM" % (
+                    slot, key or "any key", ("%g" % bpm) if bpm else "any tempo")
+                continue
+            s, reasons = score_pair(target, f)
+            slots[slot] = {"row": store.row(f.it), "score": round(s, 3), "reasons": reasons,
+                           "locked": slot in locked}
+        return {"key": key, "bpm": bpm, "seed": seed, "slots": slots, "missing": missing}

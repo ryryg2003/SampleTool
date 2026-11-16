@@ -223,6 +223,18 @@ class Handler(BaseHTTPRequestHandler):
             traceback.print_exc()
             return self._err(500, f"{type(e).__name__}: {e}")
 
+    def do_DELETE(self):
+        if not self._host_ok():
+            return self._err(403, "Forbidden host")
+        if self.headers.get("X-SLO") != "1":
+            return self._err(403, "Missing X-SLO header")
+        m = re.fullmatch(r"/api/starters/([\w-]+)", urllib.parse.urlsplit(self.path).path)
+        if not m:
+            return self._err(404, "Not found")
+        if not self.app.store.delete_starter(m.group(1)):
+            return self._err(404, "Saved set not found")
+        return self._send(200, {"ok": True})
+
     def do_POST(self):
         if not self._host_ok():
             return self._err(403, "Forbidden host")
@@ -315,6 +327,13 @@ class Handler(BaseHTTPRequestHandler):
             prop = self._propose()
             return self._send(200, {"total": total, "offset": off,
                                     "items": [st.row(i, prop) for i in rows[off:off + lim]]})
+        if path == "/api/starters":
+            out = []
+            for sv in st.starters():
+                sv = dict(sv)
+                sv["rows"] = [st.row(st.by_id[i]) for i in sv.get("ids", []) if i in st.by_id]
+                out.append(sv)
+            return self._send(200, {"items": out})
         m = re.fullmatch(r"/api/samples/([\w-]+)/matches", path)
         if m:
             from . import matching
@@ -521,6 +540,16 @@ class Handler(BaseHTTPRequestHandler):
             items = st.edit_items(list(b.get("ids") or []), dict(b.get("changes") or {}))
             prop = self._propose()
             return self._send(200, {"ok": True, "updated": len(items), "items": [st.row(i, prop) for i in items]})
+        if path == "/api/starter":
+            from . import matching
+            bpm = b.get("bpm")
+            return self._send(200, matching.starter(
+                st, b.get("key") or None, float(bpm) if bpm else None,
+                b.get("locked") or {}, int(b["seed"]) if b.get("seed") else None))
+        if path == "/api/starters":
+            bpm = b.get("bpm")
+            return self._send(200, {"ok": True, "starter": st.save_starter(
+                b.get("name") or "", b.get("key"), float(bpm) if bpm else None, b.get("ids") or [])})
         if path == "/api/kits/edit":
             kit = st.edit_kit(b)
             return self._send(200, {"ok": True, "kit": kit})

@@ -119,6 +119,29 @@ class Store:
             self.execution = ex
             self._index_results()
 
+    # ------------------------------------------------------- Beat Starter sets
+    def starters(self) -> list:
+        return self._read_json("starters.json", [])
+
+    def save_starter(self, name: str, key: Optional[str], bpm: Optional[float], ids: list) -> dict:
+        import uuid
+        if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+            raise ValueError("ids must be a list of sample ids")
+        s = {"id": uuid.uuid4().hex[:12], "name": (name or "Untitled").strip()[:80],
+             "key": key, "bpm": bpm, "ids": ids, "created": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        with self.lock:
+            self._write_json("starters.json", self.starters() + [s])
+        return s
+
+    def delete_starter(self, sid: str) -> bool:
+        with self.lock:
+            cur = self.starters()
+            keep = [s for s in cur if s.get("id") != sid]
+            if len(keep) == len(cur):
+                return False
+            self._write_json("starters.json", keep)
+            return True
+
     def save_edits(self) -> None:
         self._write_json("edits.json", self.edits)
         self._write_json("kit_edits.json", self.kit_edits)

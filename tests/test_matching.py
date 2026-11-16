@@ -98,5 +98,44 @@ class MatchesTest(MatchingBase):
             matching.matches(self.st, "nope")
 
 
+class StarterTest(MatchingBase):
+    def ids(self, r):
+        return {k: (v["row"]["id"] if v else None) for k, v in r["slots"].items()}
+
+    def test_seed_is_deterministic(self):
+        a = matching.starter(self.st, seed=7)
+        b = matching.starter(self.st, seed=7)
+        self.assertEqual(self.ids(a), self.ids(b))
+        self.assertEqual(a["seed"], 7)
+        self.assertEqual(set(a["slots"]), {"drums", "bass", "melody"})
+
+    def test_locked_slot_sets_key_and_tempo(self):
+        rel = next(i["id"] for i in self.items if i["name"] == "Bass Rel.wav")
+        r = matching.starter(self.st, locked={"bass": rel}, seed=1)
+        self.assertEqual(r["slots"]["bass"]["row"]["id"], rel)
+        self.assertEqual((r["key"], r["bpm"]), ("C", 128))
+        self.assertIn(r["slots"]["melody"]["row"]["key"], {"Am", "C"})
+        self.assertEqual(r["slots"]["drums"]["row"]["bpm"], 128)
+
+    def test_explicit_key_and_bpm(self):
+        r = matching.starter(self.st, key="Am", bpm=128, seed=3)
+        self.assertEqual(r["slots"]["bass"]["row"]["name"], "Bass Same.wav")
+
+    def test_missing_slot_explained(self):
+        self.st._set_inventory([i for i in self.items if "Bass" not in i["name"]], [], persist=False)
+        r = matching.starter(self.st, key="Am", bpm=128, seed=2)
+        self.assertIsNone(r["slots"]["bass"])
+        self.assertIn("bass", r["missing"]["bass"].lower())
+
+    def test_saved_sets_round_trip(self):
+        ids = [self.items[0]["id"], self.items[4]["id"]]
+        s = self.st.save_starter("Night", "Am", 128, ids)
+        self.assertEqual([x["name"] for x in self.st.starters()], ["Night"])
+        self.assertEqual(self.st.starters()[0]["ids"], ids)
+        self.assertTrue(self.st.delete_starter(s["id"]))
+        self.assertEqual(self.st.starters(), [])
+        self.assertFalse(self.st.delete_starter(s["id"]))
+
+
 if __name__ == "__main__":
     unittest.main()
