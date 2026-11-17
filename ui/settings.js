@@ -43,8 +43,9 @@ window.FixtureExt = window.FixtureExt || [];
   window.FixtureExt.push((method, path, query, body, st, { ok, err }) => {
     const payload = () => ({
       settings: Object.assign({}, saved, { root: st.root }), defaults,
-      info: { version: '3.0.0', data_dir: st.data_dir, settings_file: st.data_dir + '\\settings.json',
-              log_file: st.data_dir + '\\logs\\app.log', port_in_use: 8765, idle_exit: 180 },
+      info: { version: '3.1.0', data_dir: st.data_dir, settings_file: st.data_dir + '\\settings.json',
+              log_file: st.data_dir + '\\logs\\app.log', port_in_use: 8765, idle_exit: 180,
+              python: { version: '3.14.10', executable: 'C:\\Tools\\SampleOrganizer\\python\\pythonw.exe', bundled: true } },
       busy: !!(st.progress && st.progress.running), job: null,
     });
     if (path === '/api/settings' && method === 'GET') return ok(payload());
@@ -89,7 +90,8 @@ const Settings = {
           <h2 class="set-h" id="set-col-h">Collection folder</h2>
           <label class="field-label" for="set-root">Folder that holds your sample packs</label>
           <div class="set-row">
-            <input id="set-root" class="input input-path" type="text" spellcheck="false" autocomplete="off">
+            <input id="set-root" class="input input-path" type="text" spellcheck="false" autocomplete="off" placeholder="Choose a folder, or paste its path">
+            <button class="btn" id="set-pick" type="button">Choose…</button>
             <button class="btn btn-primary" id="set-switch" type="button">Switch and scan</button>
           </div>
           <p class="set-help" id="set-root-help">Switching starts a read-only scan of the new folder. The plan and any approval for the current folder are cleared.</p>
@@ -140,6 +142,20 @@ const Settings = {
           <p class="set-msg err" id="set-port-err" role="alert" hidden></p>
         </section>
 
+        <section class="panel glass set-sec" aria-labelledby="set-help-h">
+          <h2 class="set-h" id="set-help-h">Help and setup</h2>
+          <div class="set-grid">
+            <span class="field-label">Python</span>
+            <div class="set-ctl"><span id="set-python">…</span></div>
+            <span class="field-label">Getting started</span>
+            <div class="set-ctl">
+              <button class="btn btn-small" id="set-welcome" type="button">Show the welcome steps</button>
+              <button class="btn btn-small btn-ghost" id="set-keys" type="button">Keyboard shortcuts</button>
+            </div>
+          </div>
+          <p class="set-help"><span id="set-python-help"></span> Your scans and settings live in the app data folder below and survive updates.</p>
+        </section>
+
 
         <section class="panel glass set-sec" aria-labelledby="set-about-h">
           <h2 class="set-h" id="set-about-h">About</h2>
@@ -160,6 +176,8 @@ const Settings = {
       this.save({ density: b.dataset.d }, b.dataset.d === 'compact' ? 'Compact rows' : 'Comfortable rows');
     }));
     $('#set-port-save').addEventListener('click', () => this.savePort());
+    $('#set-welcome').addEventListener('click', () => { if (typeof Welcome === 'object') Welcome.reopen(); });
+    $('#set-keys').addEventListener('click', () => $('#keys-dlg').showModal());
     $('#set-port').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); this.savePort(); } });
     this.buildDialog();
     App.on('state', (s) => {
@@ -242,6 +260,13 @@ const Settings = {
     this.renderDensity(s.density);
     if (document.activeElement !== $('#set-port')) $('#set-port').value = s.port;
     $('#set-port-now').textContent = i.port_in_use ? `Running on ${i.port_in_use} now` : '';
+    const py = i.python;
+    const pyEl = $('#set-python');
+    pyEl.textContent = !py ? 'Unknown' : py.bundled ? `Python ${py.version}, bundled with the app` : `Python ${py.version}, installed on this PC`;
+    pyEl.title = (py && py.executable) || '';
+    $('#set-python-help').textContent = py && !py.bundled
+      ? 'The bundled copy in the "python" folder is missing or could not start, so your installed Python is used.'
+      : 'The app brings its own Python, so nothing needs installing.';
     if (i.version) $('#app-version').textContent = i.version;
     const row = (k, v, actions) => `<dt>${esc(k)}</dt><dd><span class="mono set-path" title="${esc(v)}">${esc(v || '')}</span>${actions || ''}</dd>`;
     const copyBtn = (v) => v ? `<button class="btn btn-small btn-ghost" type="button" data-copy="${esc(v)}">Copy</button>` : '';

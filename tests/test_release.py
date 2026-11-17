@@ -27,9 +27,10 @@ class ReleaseZipTest(unittest.TestCase):
             self.assertTrue(all(n.startswith(top) for n in names))
             rel = [n[len(top):] for n in names]
             for need in ("samplelib/__main__.py", "samplelib/server.py", "ui/index.html", "ui/app.js",
-                         "Launch Sample Organizer.bat", "README.md", "NOTICE.txt"):
+                         "Launch Sample Organizer.bat", "README.md", "NOTICE.txt",
+                         "python/python.exe", "python/pythonw.exe"):
                 self.assertIn(need, rel)
-            allowed_top = {"samplelib", "ui"} | set(build_release.INCLUDE_FILES)
+            allowed_top = {"samplelib", "ui", "python"} | set(build_release.INCLUDE_FILES)
             for r in rel:
                 self.assertIn(r.split("/")[0], allowed_top, r)
                 self.assertNotIn("__pycache__", r)

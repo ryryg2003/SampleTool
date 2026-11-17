@@ -135,6 +135,19 @@ class SettingsApiTest(unittest.TestCase):
         self.assertEqual(j["info"]["data_dir"], self.env.data)
         self.assertTrue(j["info"]["log_file"].endswith(os.path.join("logs", "app.log")))
         self.assertFalse(j["busy"])
+        py = j["info"]["python"]
+        self.assertEqual(py["version"], "%d.%d.%d" % sys.version_info[:3])
+        self.assertEqual(py["executable"], sys.executable)
+        on_bundled = os.path.normcase(os.path.dirname(os.path.abspath(sys.executable))) == \
+            os.path.normcase(os.path.join(REPO, "python"))
+        self.assertEqual(py["bundled"], on_bundled)
+
+    def test_python_info_spots_the_bundled_copy(self):
+        from samplelib import api_settings
+        exe = os.path.join(REPO, "python", "pythonw.exe")
+        self.assertTrue(api_settings.python_info(exe)["bundled"])
+        self.assertFalse(api_settings.python_info(os.path.join(REPO, "python-other", "python.exe"))["bundled"])
+        self.assertFalse(api_settings.python_info("")["bundled"])
 
     def test_post_partial(self):
         _, j = self.env.post("/api/settings", {"volume": 42})
@@ -543,10 +556,35 @@ class IconTest(unittest.TestCase):
         with open(svg, encoding="utf-8") as f:
             self.assertIn("#F0B43C", f.read())
 
+    @staticmethod
+    def _ico_frames(blob: bytes) -> list:
+        """Each frame's (directory entry, PNG header, decompressed pixel rows). Compares
+        what the icon shows, not how zlib packed it: zlib builds differ (Python 3.14
+        on Windows uses zlib-ng), so identical pixels can compress to other bytes."""
+        _res, _typ, count = struct.unpack("<HHH", blob[:6])
+        frames = []
+        for i in range(count):
+            entry = blob[6 + 16 * i: 6 + 16 * (i + 1)]
+            size, offset = struct.unpack("<II", entry[8:16])
+            png = blob[offset:offset + size]
+            pos, ihdr, idat = 8, None, b""
+            while pos < len(png):
+                n = struct.unpack(">I", png[pos:pos + 4])[0]
+                tag, data = png[pos + 4:pos + 8], png[pos + 8:pos + 8 + n]
+                if tag == b"IHDR":
+                    ihdr = data
+                elif tag == b"IDAT":
+                    idat += data
+                pos += 12 + n
+            frames.append((entry[:8], ihdr, zlib.decompress(idat)))
+        return frames
+
     def test_committed_icon_is_current(self):
         _svg, ico = self.mi.build(self.d)
         with open(ico, "rb") as a, open(os.path.join(REPO, "ui", "app.ico"), "rb") as b:
-            self.assertEqual(a.read(), b.read(), "run python tools/make_icon.py and commit ui/app.ico")
+            built, committed = self._ico_frames(a.read()), self._ico_frames(b.read())
+        self.assertEqual(len(built), 7)
+        self.assertEqual(built, committed, "run python tools/make_icon.py and commit ui/app.ico")
         with open(os.path.join(REPO, "ui", "index.html"), encoding="utf-8") as f:
             self.assertIn('rel="icon" href="icon.svg"', f.read())
 
@@ -587,6 +625,8 @@ class WindowsDesktopTest(unittest.TestCase):
             out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], env=dict(os.environ, LNK=lnk),
                                  capture_output=True, text=True, timeout=60).stdout.splitlines()
             self.assertTrue(out[0].lower().endswith("pythonw.exe"), out)
+            self.assertEqual(os.path.normcase(out[0]), os.path.normcase(os.path.join(REPO, "python", "pythonw.exe")),
+                             "the shortcut uses the bundled Python")
             self.assertEqual(out[1], "-m samplelib")
             self.assertEqual(os.path.normcase(out[2].rstrip("\\")), os.path.normcase(REPO))
             self.assertIn("app.ico", out[3])

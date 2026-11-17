@@ -96,7 +96,7 @@ class Store:
     def _load_settings(self, root: str) -> None:
         from . import settings
         s = settings.load(self.data_dir)
-        self.root = root or s.get("root") or (r"E:\Sample Packs" if os.name == "nt" else "")
+        self.root = root or s.get("root") or ""  # first run: the user picks the folder
         self.save_settings()
 
     def save_settings(self) -> None:

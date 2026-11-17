@@ -47,6 +47,8 @@ function url(hash) {
   const rows = '#lib-table .vt-row:not(.is-ph)';
   const countOf = async (sel) => parseInt(((await page.textContent(sel)) || '0').replace(/[^\d]/g, ''), 10) || 0;
   const settle = (ms) => page.waitForTimeout(ms || 350);
+  // The less used filters live in the "More filters" panel; open it before using them.
+  const openMore = async () => { if (await page.isHidden('#lib-more-panel')) { await page.click('#lib-more'); await page.waitForSelector('#lib-more-panel', { state: 'visible' }); } };
 
   try {
     // ---------- Play all clock (pure math from ui/mixclock.js, no browser) ----------
@@ -78,14 +80,35 @@ function url(hash) {
     check('library loads rows', total0 > 0, `count=${total0}`);
     check('no horizontal page overflow (library)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     check('nav always visible', (await page.locator('.rail-btn').count()) === 6);
+    {
+      const bar = await page.evaluate(() => {
+        const kids = [...document.getElementById('lib-filters').children].filter((k) => k.offsetParent !== null);
+        const tops = kids.map((k) => Math.round(k.getBoundingClientRect().top));
+        const f = document.getElementById('lib-filters');
+        return { n: kids.length, spread: Math.max(...tops) - Math.min(...tops), h: f.getBoundingClientRect().height, over: f.scrollWidth > f.clientWidth + 1 };
+      });
+      check('filter bar fits one row at 1366 px', bar.n >= 7 && bar.spread <= 2 && bar.h <= 40 && !bar.over, JSON.stringify(bar));
+      check('no chips row while nothing is filtered', await page.isHidden('#lib-chips-row'));
+      check('More filters panel starts closed', await page.isHidden('#lib-more-panel') && (await page.getAttribute('#lib-more', 'aria-expanded')) === 'false');
+      await page.click('#lib-more');
+      check('More opens the panel', await page.isVisible('#lib-more-panel') && (await page.getAttribute('#lib-more', 'aria-expanded')) === 'true');
+      await shot('01b-library-more');
+      await page.keyboard.press('Escape');
+      check('Esc closes the panel', await page.isHidden('#lib-more-panel'));
+    }
     for (const [ft, label] of [['key_compat', 'Compatible keys'], ['bpm_half', 'Half/double'], ['verified', 'Verified only']]) {
       const b = `#lib-filters [data-ft="${ft}"]`;
+      await openMore();
       await page.click(b); await settle();
+      check(`More shows how many hidden filters are on (${ft})`, (await page.textContent('#lib-more-n')) === '1');
       const on = (await page.getAttribute(b, 'aria-pressed')) === 'true';
       const chip = (await page.textContent('#lib-chips')).includes(label);
+      await openMore();
       await page.click(b); await settle();
       check(`filter toggle ${ft} sets and clears`, on && chip && (await page.getAttribute(b, 'aria-pressed')) === 'false');
     }
+    check('More panel closes when focus moves to search', await (async () => { await openMore(); await page.press('body', '/'); await settle(150); return page.isHidden('#lib-more-panel'); })());
+    await page.keyboard.press('Escape');
     await shot('01-library');
 
     // search (debounced)
@@ -359,9 +382,14 @@ function url(hash) {
       await settle(700);
       await shot('09-scan-progress');
       check('scan progress shows counts', /[\d,]+ \/ [\d,]+ files/.test(await page.textContent('#sp-count')));
+      check('scan progress shows the step', /^Step [1-5] of 5$/.test(await page.textContent('#sp-step')), await page.textContent('#sp-step'));
+      check('scan progress shows time left', /left/.test(await page.textContent('#sp-eta')), await page.textContent('#sp-eta'));
+      check('status bar shows time left', /left/.test(await page.textContent('#sb-count')), await page.textContent('#sb-count'));
       await page.waitForFunction(() => !document.getElementById('scan-start').disabled, null, { timeout: 20000 });
       await settle(600);
       check('scan summary cards', (await page.locator('#scan-summary .card').count()) >= 8);
+      check('scan summary offers Try Beat Starter', await page.isVisible('#scan-to-starter'));
+      check('time left cleared after the scan', (await page.textContent('#sp-eta')) === '');
     }
     await shot('10-scan');
 
@@ -449,11 +477,13 @@ function url(hash) {
         check('star column toggles', (await page.locator(`${rows} >> nth=0`).locator('.ib.star.on').count()) === 0);
         // New filter chip
         const newN = parseInt((await page.textContent('#lib-new-n')).replace(/\D/g, ''), 10);
+        await openMore();
         await page.click('#lib-new');
         await settle(500);
         check('New filter chip', (await page.locator('#lib-chips .chip').filter({ hasText: 'New' }).count()) === 1 && (await page.getAttribute('#lib-new', 'aria-pressed')) === 'true');
         check('New filter narrows the table', (await countOf('#lib-count')) > 0 && (await countOf('#lib-count')) <= newN && (await countOf('#lib-count')) < totalAll);
         await shot('11-collections');
+        await openMore();
         await page.click('#lib-new');
         await settle(400);
         check('New filter clears', (await countOf('#lib-count')) === totalAll);
@@ -523,6 +553,12 @@ function url(hash) {
       check('settings: volume slider', /^\d{1,3}$/.test(await page.inputValue('#set-vol')));
       check('settings: auto-audition checkbox', await page.isVisible('#set-auto'));
       check('settings: density control', (await page.locator('#set-density [role=radio]').count()) === 2);
+      {
+        const box = async (sel) => page.evaluate((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { top: Math.round(r.top), left: Math.round(r.left), right: Math.round(r.right) }; }, sel);
+        const startup = await box('[aria-labelledby="set-port-h"]'), help = await box('[aria-labelledby="set-help-h"]');
+        check('settings: no empty slot next to Startup', help.top === startup.top && help.left > startup.right, JSON.stringify({ startup, help }));
+        check('settings: says which Python runs the app', /Python \d+\.\d+\.\d+, (bundled with the app|installed on this PC)/.test(await page.textContent('#set-python')), await page.textContent('#set-python'));
+      }
       const about = await page.textContent('#set-about');
       check('settings: version, data folder and log file shown', /\d+\.\d+\.\d+/.test(about) && /Log file/.test(about) && /App data folder/.test(about), about.slice(0, 160));
       check('settings: no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
@@ -566,6 +602,78 @@ function url(hash) {
     // <<< settings checks
     //
     //
+    // ---------- First run (fixture only): pick a folder, scan, Try Beat Starter ----------
+    if (fixture) {
+      const fr = await ctx.newPage();
+      fr.on('console', (m) => { if (m.type() === 'error' && !/api\/audio|favicon/.test(m.text())) consoleErrors.push('first run: ' + m.text()); });
+      fr.on('pageerror', (e) => consoleErrors.push('first run pageerror: ' + e.message));
+      const fu = new URL(base); fu.searchParams.set('firstrun', '1'); fu.hash = '';
+      await fr.goto(fu.toString());
+      await fr.waitForSelector('#welcome:not([hidden])', { timeout: 10000 });
+      await fr.waitForTimeout(400);
+      check('first run: opens on the welcome steps', (await fr.evaluate(() => App.view)) === 'scan' && /three steps/.test(await fr.textContent('#scan-h')));
+      check('first run: no folder preset', (await fr.inputValue('#scan-root')) === '');
+      check('first run: step 1 is current', await fr.evaluate(() => document.getElementById('wl-1').classList.contains('is-current')));
+      check('first run: scan and Beat Starter wait', await fr.isDisabled('#wl-scan') && await fr.isDisabled('#wl-starter'));
+      check('first run: no horizontal overflow', await fr.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      if (shotDir) await fr.screenshot({ path: `${shotDir}/15-first-run.png` });
+      await fr.click('#wl-pick');
+      await fr.waitForSelector('#folder-dlg[open]');
+      await fr.waitForSelector('#fp-list .fp-item');
+      check('picker: starts at This PC with places', (await fr.inputValue('#fp-path')) === '' && (await fr.locator('#fp-places .fp-place').count()) >= 3);
+      check('picker: Use this folder waits for a folder', await fr.isDisabled('#fp-use'));
+      await fr.locator('#fp-list .fp-item', { hasText: 'D:\\' }).click();
+      await fr.waitForFunction(() => document.getElementById('fp-path').value === 'D:\\');
+      await fr.locator('#fp-list .fp-item', { hasText: /^Music$/ }).click();
+      await fr.waitForFunction(() => document.getElementById('fp-path').value === 'D:\\Music');
+      check('picker: counts audio files in a folder', /2 audio files right here/.test(await fr.textContent('#fp-info')), await fr.textContent('#fp-info'));
+      await fr.click('#fp-up');
+      await fr.waitForFunction(() => document.getElementById('fp-path').value === 'D:\\');
+      check('picker: Up goes to the parent', true);
+      await fr.fill('#fp-path', 'D:\\Nope\\Missing');
+      await fr.press('#fp-path', 'Enter');
+      await fr.waitForSelector('#fp-err:not([hidden])');
+      check('picker: a wrong path shows an error', /Folder not found/.test(await fr.textContent('#fp-err')));
+      await fr.fill('#fp-path', 'D:\\Music\\Sample Packs');
+      await fr.press('#fp-path', 'Enter');
+      await fr.waitForFunction(() => document.getElementById('fp-path').value === 'D:\\Music\\Sample Packs' && document.getElementById('fp-err').hidden);
+      if (shotDir) await fr.screenshot({ path: `${shotDir}/16-folder-picker.png` });
+      await fr.click('#fp-use');
+      await fr.waitForSelector('#folder-dlg:not([open])', { state: 'attached' });
+      await fr.waitForFunction(() => document.getElementById('scan-root').value !== '', null, { timeout: 5000 }).catch(() => {});
+      check('first run: picked folder fills in', (await fr.inputValue('#scan-root')) === 'D:\\Music\\Sample Packs');
+      check('first run: step 2 is current', await fr.evaluate(() => document.getElementById('wl-2').classList.contains('is-current')) && !(await fr.isDisabled('#wl-scan')));
+      await fr.click('#wl-scan');
+      await fr.waitForFunction(() => /Step [1-5] of 5/.test(document.getElementById('wl-scan-text').textContent), null, { timeout: 8000 });
+      check('first run: step 2 shows the step while time left is worked out', /^Step [1-5] of 5 · .*left/.test(await fr.textContent('#wl-scan-text')), await fr.textContent('#wl-scan-text'));
+      await fr.waitForFunction(() => /(about|a few) .*left/.test(document.getElementById('wl-scan-text').textContent), null, { timeout: 8000 });
+      check('first run: step 2 shows time left in this step', /^Step [1-5] of 5 · (about|a few) .*left in this step$/.test(await fr.textContent('#wl-scan-text')), await fr.textContent('#wl-scan-text'));
+      check('first run: Cancel is offered while scanning', await fr.isVisible('#wl-cancel'));
+      await fr.waitForFunction(() => !document.getElementById('wl-starter').disabled, null, { timeout: 20000 });
+      await fr.waitForTimeout(300);
+      check('first run: Cancel hides after the scan', await fr.isHidden('#wl-cancel'));
+      check('first run: Try Beat Starter is the next step', await fr.evaluate(() => document.getElementById('wl-3').classList.contains('is-current')));
+      check('first run: Try Beat Starter has focus', await fr.evaluate(() => document.activeElement && document.activeElement.id === 'wl-starter'));
+      if (shotDir) await fr.screenshot({ path: `${shotDir}/17-first-run-done.png` });
+      await fr.click('#wl-starter');
+      await fr.waitForSelector('#view-starter:not([hidden])');
+      await fr.waitForSelector('#bs-slots .bs-slot, #bs-slots > *', { timeout: 8000 });
+      check('first run: lands on Beat Starter with a set', (await fr.evaluate(() => App.view)) === 'starter' && (await fr.locator('#bs-slots > *').count()) === 3);
+      await fr.click('.rail-btn[data-view="scan"]');
+      await fr.waitForTimeout(300);
+      check('first run: welcome is done after Beat Starter', await fr.isHidden('#welcome') && await fr.isVisible('#scan-form'));
+      await fr.close();
+    }
+    // ---------- Choose folder from the normal Scan form ----------
+    if (fixture) {
+      await page.click('.rail-btn[data-view="scan"]');
+      await page.click('#scan-pick');
+      await page.waitForSelector('#folder-dlg[open]');
+      check('scan form: Choose… opens the folder picker', true);
+      await page.keyboard.press('Escape');
+      await page.waitForSelector('#folder-dlg:not([open])', { state: 'attached' });
+      check('scan form: cancelling keeps the folder', (await page.inputValue('#scan-root')).length > 0);
+    }
     // ---------- Focus ring visible ----------
     await page.focus('.rail-btn[data-view="library"]');
     await page.keyboard.press('Shift+Tab');

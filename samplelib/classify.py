@@ -8,7 +8,9 @@ stay None; uncertain categories get low confidence so the planner holds them.
 """
 from __future__ import annotations
 
+import collections
 import functools
+import os
 import re
 from collections import defaultdict
 
@@ -764,42 +766,137 @@ def spread_pack_genre(items: list) -> None:
                 it["meta"]["genre"] = field(top, "pack", 0.5)
 
 
+# Tempo/key measurement runs in several worker processes at once (one per spare
+# CPU core) when there is enough to do; each file is independent. SLO_ANALYSIS_WORKERS
+# overrides the count (1 = one at a time in the app's own process).
+MAX_WORKERS = 6
+PARALLEL_MIN_FILES = 24
+
+
+def analysis_workers(n_files: int) -> int:
+    env = os.environ.get("SLO_ANALYSIS_WORKERS", "").strip()
+    if env.isdigit() and int(env) > 0:
+        want = int(env)
+    else:
+        if n_files < PARALLEL_MIN_FILES:
+            return 1
+        want = min(MAX_WORKERS, (os.cpu_count() or 1) - 1)
+    return max(1, min(want, n_files))
+
+
+def _run_parallel(jobs: list, workers: int, cancel, on_result) -> list:
+    """Analyze jobs [(key, path, ext, want)] in worker processes; call
+    on_result(key, result) as each finishes. Returns jobs that still need doing
+    (all of them if the pool could not start)."""
+    import concurrent.futures as cf
+    import multiprocessing as mp
+    pending = collections.deque(jobs)
+    try:
+        pool = cf.ProcessPoolExecutor(max_workers=workers, mp_context=mp.get_context("spawn"))
+    except (OSError, ValueError, NotImplementedError, ImportError):
+        return pending
+    inflight: dict = {}
+    try:
+        while pending or inflight:
+            if cancel is not None and cancel.is_set():
+                break
+            while pending and len(inflight) < workers * 3:
+                job = pending.popleft()
+                inflight[pool.submit(analysis.analyze_job, job[1], job[2], job[3])] = job
+            done, _ = cf.wait(list(inflight), timeout=0.5, return_when=cf.FIRST_COMPLETED)
+            for fut in done:
+                job = inflight.pop(fut)
+                try:
+                    res = fut.result()
+                except cf.process.BrokenProcessPool:
+                    pending.appendleft(job)
+                    raise
+                except Exception as e:  # noqa: BLE001
+                    res = (None, ["audio analysis failed: %s" % e])
+                on_result(job[0], res)
+    except cf.process.BrokenProcessPool:
+        pending.extendleft(reversed(list(inflight.values())))
+        inflight.clear()
+    finally:
+        # On cancel this still waits for the few files already handed to workers
+        # (at most workers * 3, each well under a second); queued ones are dropped.
+        pool.shutdown(wait=True, cancel_futures=True)
+    return list(pending)
+
+
 def analyze_items(items: list, cache: dict, progress=None, cancel=None,
                   analyzer=None) -> dict:
     """Measure tempo/key/bars for decodable audio, re-classify those items.
 
     cache maps sha256|version|want -> result. Returns the cache restricted to
-    the entries used by this run (stale entries drop out)."""
-    analyzer = analyzer or analysis.analyze
+    the entries used by this run (stale entries drop out). Files not in the
+    cache are measured in parallel worker processes when there are enough of
+    them (see analysis_workers); a custom analyzer always runs in-process."""
     todo = [(it, w) for it in items for w in [_analysis_want(it)] if w]
     used: dict = {}
-    for n, (it, want) in enumerate(todo):
-        if cancel is not None and cancel.is_set():
-            break
-        if n % 10 == 0:
-            _prog(progress, phase="analyzing", done=n, total=len(todo),
-                  current=it.get("rel_path", ""))
-        ck = "%s|%d|%s" % (it.get("sha256"), analysis.ANALYSIS_VERSION, ",".join(sorted(want))) \
-            if it.get("sha256") else None
-        if ck and (ck in used or ck in cache):
-            res, warns = used.get(ck) or cache[ck], []
-        else:
-            try:
-                res, warns = analyzer(it.get("abs_path", ""), it.get("ext", ""), want)
-            except Exception as e:  # analysis must never break a scan
-                res, warns = None, ["audio analysis failed: %s" % e]
-        if ck and res is not None:
-            used[ck] = res
+    total = len(todo)
+    state = {"done": 0}
+
+    def tick(it, mark):
+        state["done"] += 1
+        n = state["done"]
+        if n % 10 == 0 or n == total:
+            _prog(progress, phase="analyzing", done=n, total=total, current=it.get("rel_path", ""),
+                  eta_mark=mark)
+
+    def apply(it, want, res, warns):
         if res is None:
             it["warnings"] = list(it.get("warnings") or []) + \
                 [w for w in warns if w not in (it.get("warnings") or [])]
-            continue
+            return
         it["analysis"] = res
         _reclassify(it)
         ws = list(it.get("warnings") or [])
         it["warnings"] = ws + [w for w in _mismatch_warnings(it, want) if w not in ws]
+
+    # Cached results apply at once; the rest become jobs, one per distinct file content.
+    groups: dict = {}
+    order: list = []
+    for i, (it, want) in enumerate(todo):
+        ck = "%s|%d|%s" % (it.get("sha256"), analysis.ANALYSIS_VERSION, ",".join(sorted(want))) \
+            if it.get("sha256") else None
+        if ck and ck in cache:
+            used[ck] = cache[ck]
+            apply(it, want, cache[ck], [])
+            tick(it, "cached")
+            continue
+        key = ck or "#%d" % i
+        if key not in groups:
+            groups[key] = []
+            order.append((key, it.get("abs_path", ""), it.get("ext", ""), want))
+        groups[key].append((it, want))
+
+    def finish(key, result):
+        res, warns = result
+        if res is not None and not key.startswith("#"):
+            used[key] = res
+        for it, want in groups.pop(key, []):
+            apply(it, want, res, warns)
+            tick(it, "measuring")
+
+    # Cached files took no time: the time-left estimate starts counting from here.
+    _prog(progress, phase="analyzing", done=state["done"], total=total, eta_mark="measuring")
+    jobs = order
+    if analyzer is None and not (cancel is not None and cancel.is_set()):
+        workers = analysis_workers(len(jobs))
+        if workers > 1:
+            jobs = _run_parallel(jobs, workers, cancel, finish)
+    run = analyzer or analysis.analyze
+    for key, path, ext, want in jobs:
+        if cancel is not None and cancel.is_set():
+            break
+        try:
+            result = run(path, ext, want)
+        except Exception as e:  # analysis must never break a scan
+            result = (None, ["audio analysis failed: %s" % e])
+        finish(key, result)
     spread_pack_genre(items)
-    _prog(progress, phase="analyzing", done=len(todo), total=len(todo))
+    _prog(progress, phase="analyzing", done=total, total=total)
     return used
 
 

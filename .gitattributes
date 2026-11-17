@@ -3,6 +3,8 @@
 *.bat text eol=crlf
 *.png binary
 *.ico binary
+# Bundled official Python (Windows embeddable package): keep every byte as shipped.
+python/** binary
 
 # GitHub "Download ZIP" (git archive) holds only the app.
 tests/ export-ignore

@@ -90,7 +90,7 @@ const Library = {
       ],
       fetch: (offset, limit) => API.get('/api/samples', Object.assign(this.params(), { sort: this.table.sort, dir: this.table.dir, offset, limit })),
       onSort: (s, d) => { Store.set('lib.sort', s); Store.set('lib.dir', d); },
-      onTotal: (t) => { $('#lib-count').textContent = Fmt.num(t) + (t === 1 ? ' sample' : ' samples'); },
+      onTotal: (t) => { $('#lib-count').textContent = Fmt.num(t) + ' shown'; },
       isSelected: (r) => this.sel.has(r.id),
       rowClass: (r) => `cat-${catSlug(r.category)}${r.excluded ? ' is-excl' : ''}${Player.isPlaying(r.id) ? ' is-playing' : ''}`,
       onRowClick: (i, r, ev) => this.click(i, r, ev),
@@ -128,6 +128,11 @@ const Library = {
       this.apply();
     }));
     $('#lib-clear').addEventListener('click', () => this.clearAll());
+    $('#lib-more').addEventListener('click', () => this.setMore($('#lib-more-panel').hidden));
+    $('#lib-more-panel').addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); this.setMore(false); $('#lib-more').focus(); } });
+    document.addEventListener('pointerdown', (ev) => { if (!$('#lib-more-panel').hidden && !ev.target.closest('.more-wrap')) this.setMore(false); });
+    // Typing or tabbing elsewhere (search with "/", another filter) closes it too.
+    $('.more-wrap').addEventListener('focusout', (ev) => { if (!ev.relatedTarget || !ev.relatedTarget.closest('.more-wrap')) this.setMore(false); });
     $('#lib-allfiles').checked = this.allFiles;
     $('#lib-allfiles').addEventListener('change', () => { this.allFiles = $('#lib-allfiles').checked; Store.set('lib.allFiles', this.allFiles); this.apply(); });
     $('#pack-q').addEventListener('input', debounce(() => this.loadPacks(), 150));
@@ -263,11 +268,27 @@ const Library = {
     }));
     $('#lib-clear').hidden = chips.length === 0;
     $('#lib-save-smart').hidden = chips.length === 0;
+    $('#lib-chips-row').hidden = chips.length === 0;
+    $('#lib-count').hidden = chips.length === 0;  // unfiltered, the header already says how many
     const nb = $('#lib-new'); nb.setAttribute('aria-pressed', this.newOnly ? 'true' : 'false'); nb.classList.toggle('is-set', this.newOnly);
     App.emit('lib-filters', this.params());
     $$('#lib-filters [data-f]').forEach((el) => el.classList.toggle('is-set', !!this.filters[el.dataset.f]));
     $$('#lib-filters [data-ft]').forEach((b) => b.setAttribute('aria-pressed', String(!!this.filters[b.dataset.ft])));
+    this.renderMore();
     this.renderStats();
+  },
+  /* "More filters": how many of the filters inside the panel are on. */
+  renderMore() {
+    const f = this.filters;
+    const n = ['manufacturer', 'status', 'key_compat', 'bpm_half', 'verified'].filter((k) => f[k]).length + (this.newOnly ? 1 : 0) + (this.allFiles ? 1 : 0);
+    $('#lib-more-n').textContent = n ? String(n) : '';
+    $('#lib-more').classList.toggle('is-set', n > 0);
+  },
+  setMore(open) {
+    const p = $('#lib-more-panel'), b = $('#lib-more');
+    p.hidden = !open;
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) { const first = p.querySelector('select, button, input'); if (first) first.focus(); }
   },
 
   clearAll() {

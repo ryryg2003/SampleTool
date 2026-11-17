@@ -9,6 +9,7 @@ POST /api/focus             -> {"ok": true}; a second launch announces itself.
 from __future__ import annotations
 
 import os
+import sys
 import time
 
 from . import __version__, settings, winapp
@@ -21,13 +22,25 @@ def init(app) -> None:
     winapp.track_ui_requests(app)
 
 
+BUNDLED_PYTHON_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "python")
+
+
+def python_info(executable: str | None = None) -> dict:
+    """Which Python runs the app: the copy bundled in python/ or an installed one."""
+    exe = sys.executable if executable is None else executable
+    here = os.path.dirname(os.path.abspath(exe)) if exe else ""
+    bundled = bool(exe) and os.path.normcase(here) == os.path.normcase(BUNDLED_PYTHON_DIR)
+    return {"version": "%d.%d.%d" % sys.version_info[:3], "executable": exe or "", "bundled": bundled}
+
+
 def _info(app) -> dict:
     st = app.store
     return {"version": __version__, "data_dir": st.data_dir,
             "settings_file": settings.path(st.data_dir),
             "log_file": getattr(app, "log_file", None) or winapp.log_file_path(st.data_dir),
             "port_in_use": getattr(app, "port", None),
-            "idle_exit": getattr(app, "idle_exit", 0)}
+            "idle_exit": getattr(app, "idle_exit", 0),
+            "python": python_info()}
 
 
 def _payload(app) -> dict:
