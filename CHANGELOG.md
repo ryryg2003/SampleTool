@@ -1,5 +1,40 @@
 # Changelog
 
+## 3.1.0
+
+A first-time user can run it with no setup.
+
+**No install**
+- The app brings its own Python: the official Windows embeddable package
+  (Python 3.14.10, x64) from python.org is in the `python` folder. Both
+  launchers use it and fall back to an installed Python 3.10+ only if it is
+  missing.
+- Settings shows which Python runs the app.
+
+**First run**
+- No more `E:\Sample Packs` default. A fresh install opens on three steps:
+  pick your sample folder, scan it, Try Beat Starter.
+- A folder picker (drives, Music, Documents, Desktop, Downloads, subfolders,
+  audio-file count) on the welcome screen, the Scan form and Settings.
+  Pasting a path still works.
+- The scan summary leads with Try Beat Starter.
+
+**Faster, clearer scans**
+- Tempo and key are measured about 5x faster: the number crunching runs at
+  C speed and several files are measured at once (one per spare CPU core, up
+  to six). Results are the same as before.
+- Scan progress shows "Step n of 5" and the time left in the current step,
+  also in the status bar.
+
+**Look**
+- Library filters fit one row at 1366 px. Maker, status and the toggles
+  moved into a **More** panel that shows how many are on.
+- Settings has a Help and setup panel in the slot that was empty.
+
+**Docs**
+- README: AIFF previews do work (converted to WAV as they play); only REX
+  cannot be previewed.
+
 ## 3.0.0
 
 One final version that combines every feature branch.

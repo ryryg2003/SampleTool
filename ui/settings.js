@@ -43,7 +43,7 @@ window.FixtureExt = window.FixtureExt || [];
   window.FixtureExt.push((method, path, query, body, st, { ok, err }) => {
     const payload = () => ({
       settings: Object.assign({}, saved, { root: st.root }), defaults,
-      info: { version: '3.0.0', data_dir: st.data_dir, settings_file: st.data_dir + '\\settings.json',
+      info: { version: '3.1.0', data_dir: st.data_dir, settings_file: st.data_dir + '\\settings.json',
               log_file: st.data_dir + '\\logs\\app.log', port_in_use: 8765, idle_exit: 180,
               python: { version: '3.14.10', executable: 'C:\\Tools\\SampleOrganizer\\python\\pythonw.exe', bundled: true } },
       busy: !!(st.progress && st.progress.running), job: null,
