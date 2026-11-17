@@ -556,10 +556,35 @@ class IconTest(unittest.TestCase):
         with open(svg, encoding="utf-8") as f:
             self.assertIn("#F0B43C", f.read())
 
+    @staticmethod
+    def _ico_frames(blob: bytes) -> list:
+        """Each frame's (directory entry, PNG header, decompressed pixel rows). Compares
+        what the icon shows, not how zlib packed it: zlib builds differ (Python 3.14
+        on Windows uses zlib-ng), so identical pixels can compress to other bytes."""
+        _res, _typ, count = struct.unpack("<HHH", blob[:6])
+        frames = []
+        for i in range(count):
+            entry = blob[6 + 16 * i: 6 + 16 * (i + 1)]
+            size, offset = struct.unpack("<II", entry[8:16])
+            png = blob[offset:offset + size]
+            pos, ihdr, idat = 8, None, b""
+            while pos < len(png):
+                n = struct.unpack(">I", png[pos:pos + 4])[0]
+                tag, data = png[pos + 4:pos + 8], png[pos + 8:pos + 8 + n]
+                if tag == b"IHDR":
+                    ihdr = data
+                elif tag == b"IDAT":
+                    idat += data
+                pos += 12 + n
+            frames.append((entry[:8], ihdr, zlib.decompress(idat)))
+        return frames
+
     def test_committed_icon_is_current(self):
         _svg, ico = self.mi.build(self.d)
         with open(ico, "rb") as a, open(os.path.join(REPO, "ui", "app.ico"), "rb") as b:
-            self.assertEqual(a.read(), b.read(), "run python tools/make_icon.py and commit ui/app.ico")
+            built, committed = self._ico_frames(a.read()), self._ico_frames(b.read())
+        self.assertEqual(len(built), 7)
+        self.assertEqual(built, committed, "run python tools/make_icon.py and commit ui/app.ico")
         with open(os.path.join(REPO, "ui", "index.html"), encoding="utf-8") as f:
             self.assertIn('rel="icon" href="icon.svg"', f.read())
 
