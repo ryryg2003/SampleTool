@@ -115,6 +115,26 @@ class LauncherPrefersBundledTest(unittest.TestCase):
         self.assertLess(bat.index("where py"), bat.index("where python"), "installed Python is the fallback")
         self.assertNotIn("E:\\", bat, "no E: drive default")
 
+    def test_paths_stay_quoted_and_out_of_blocks(self):
+        """A folder such as "SampleTool-main (1)" or "Beats & Loops" must not break
+        cmd's parsing: %~dp0 is only ever expanded inside quotes, and never inside
+        a ( ) block, which cmd reads whole (with %vars% expanded) before running."""
+        for name in ("Launch Sample Organizer.bat", "Create Desktop Shortcut.bat"):
+            depth = 0
+            for n, line in enumerate(_read(name).splitlines(), 1):
+                code = line.strip()
+                if code.lower().startswith("rem") or code.startswith("::"):
+                    continue
+                for var in ("%~dp0", "%REPO%", "%BUNDLED%"):
+                    start = 0
+                    while (i := line.find(var, start)) >= 0:
+                        self.assertEqual(line[:i].count('"') % 2, 1, f"{name}:{n} {var} outside quotes")
+                        if var == "%~dp0":
+                            self.assertEqual(depth, 0, f"{name}:{n} %~dp0 inside a ( ) block")
+                        start = i + len(var)
+                outside = "".join(part for k, part in enumerate(line.split('"')) if k % 2 == 0)
+                depth += outside.count("(") - outside.count(")")
+
     def test_shortcut_launcher(self):
         bat = _read("Create Desktop Shortcut.bat")
         self.assertLess(bat.index(r"python\pythonw.exe"), bat.index("py -3"))

@@ -645,9 +645,11 @@ function url(hash) {
       await fr.waitForFunction(() => /Step [1-5] of 5/.test(document.getElementById('wl-scan-text').textContent), null, { timeout: 8000 });
       check('first run: step 2 shows the step while time left is worked out', /^Step [1-5] of 5 · .*left/.test(await fr.textContent('#wl-scan-text')), await fr.textContent('#wl-scan-text'));
       await fr.waitForFunction(() => /(about|a few) .*left/.test(document.getElementById('wl-scan-text').textContent), null, { timeout: 8000 });
-      check('first run: step 2 shows time left', /^Step [1-5] of 5 · (about|a few) .*left$/.test(await fr.textContent('#wl-scan-text')), await fr.textContent('#wl-scan-text'));
+      check('first run: step 2 shows time left in this step', /^Step [1-5] of 5 · (about|a few) .*left in this step$/.test(await fr.textContent('#wl-scan-text')), await fr.textContent('#wl-scan-text'));
+      check('first run: Cancel is offered while scanning', await fr.isVisible('#wl-cancel'));
       await fr.waitForFunction(() => !document.getElementById('wl-starter').disabled, null, { timeout: 20000 });
       await fr.waitForTimeout(300);
+      check('first run: Cancel hides after the scan', await fr.isHidden('#wl-cancel'));
       check('first run: Try Beat Starter is the next step', await fr.evaluate(() => document.getElementById('wl-3').classList.contains('is-current')));
       check('first run: Try Beat Starter has focus', await fr.evaluate(() => document.activeElement && document.activeElement.id === 'wl-starter'));
       if (shotDir) await fr.screenshot({ path: `${shotDir}/17-first-run-done.png` });

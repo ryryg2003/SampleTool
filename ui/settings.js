@@ -153,7 +153,7 @@ const Settings = {
               <button class="btn btn-small btn-ghost" id="set-keys" type="button">Keyboard shortcuts</button>
             </div>
           </div>
-          <p class="set-help">The app brings its own Python, so nothing needs installing. Your scans and settings live in the app data folder below and survive updates.</p>
+          <p class="set-help"><span id="set-python-help"></span> Your scans and settings live in the app data folder below and survive updates.</p>
         </section>
 
 
@@ -264,6 +264,9 @@ const Settings = {
     const pyEl = $('#set-python');
     pyEl.textContent = !py ? 'Unknown' : py.bundled ? `Python ${py.version}, bundled with the app` : `Python ${py.version}, installed on this PC`;
     pyEl.title = (py && py.executable) || '';
+    $('#set-python-help').textContent = py && !py.bundled
+      ? 'The bundled copy in the "python" folder is missing or could not start, so your installed Python is used.'
+      : 'The app brings its own Python, so nothing needs installing.';
     if (i.version) $('#app-version').textContent = i.version;
     const row = (k, v, actions) => `<dt>${esc(k)}</dt><dd><span class="mono set-path" title="${esc(v)}">${esc(v || '')}</span>${actions || ''}</dd>`;
     const copyBtn = (v) => v ? `<button class="btn btn-small btn-ghost" type="button" data-copy="${esc(v)}">Copy</button>` : '';

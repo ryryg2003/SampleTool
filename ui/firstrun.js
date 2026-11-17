@@ -13,9 +13,11 @@ function fmtLeft(s) {
   const h = Math.floor(s / 3600), m = Math.round((s - h * 3600) / 60);
   return `about ${h} h${m ? ' ' + m + ' min' : ''} left`;
 }
+/* Scans report time left in the current step (the next steps have different costs). */
 function progressLeft(p) {
   if (!p || !p.running) return '';
-  return p.eta_s !== null && p.eta_s !== undefined ? fmtLeft(p.eta_s) : 'working out time left…';
+  if (p.eta_s === null || p.eta_s === undefined) return 'working out time left…';
+  return fmtLeft(p.eta_s) + (p.step ? ' in this step' : '');
 }
 
 /* ---------- Fixture routes (fixture mode only; memory only) ---------- */
@@ -118,10 +120,14 @@ const Welcome = {
   init() {
     $('#wl-pick').addEventListener('click', () => this.pick());
     $('#wl-scan').addEventListener('click', () => Scan.start());
+    $('#wl-cancel').addEventListener('click', () => Scan.cancel());
     $('#wl-starter').addEventListener('click', () => { this.finish(); Shell.go('starter'); });
     App.on('state', (s) => {
-      // A true first run: nothing scanned and no folder saved or passed in (--root).
-      if (s && !this.seen) { this.seen = true; this.active = !s.has_inventory && !s.root; }
+      // A first run: nothing scanned, and no usable folder saved or passed in (--root).
+      // Version 3.0 saved a default folder that may not exist on this PC.
+      const noFolder = s && (!s.root || s.root_exists === false);
+      if (s && !this.seen) { this.seen = true; this.active = !s.has_inventory && noFolder; }
+      if (this.active && noFolder && !Scan.edited) $('#scan-root').value = '';
       this.render();
     });
   },
@@ -169,6 +175,7 @@ const Welcome = {
     wscan.disabled = !folder || scanning;
     wscan.classList.toggle('btn-primary', step === 2 && !scanning);
     wscan.textContent = scanning ? 'Scanning…' : (scanned ? 'Scan again' : 'Start scan');
+    $('#wl-cancel').hidden = !scanning;
     $('#wl-scan-text').textContent = scanning
       ? [p.step && p.steps ? `Step ${p.step} of ${p.steps}` : '', progressLeft(p)].filter(Boolean).join(' · ')
       : scanned ? (s.counts ? `Done: ${Fmt.num(s.counts.files)} files found. Nothing was changed.` : 'Done. Nothing was changed.')

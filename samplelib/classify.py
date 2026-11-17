@@ -8,6 +8,7 @@ stay None; uncertain categories get low confidence so the planner holds them.
 """
 from __future__ import annotations
 
+import collections
 import functools
 import os
 import re
@@ -789,7 +790,7 @@ def _run_parallel(jobs: list, workers: int, cancel, on_result) -> list:
     (all of them if the pool could not start)."""
     import concurrent.futures as cf
     import multiprocessing as mp
-    pending = list(jobs)
+    pending = collections.deque(jobs)
     try:
         pool = cf.ProcessPoolExecutor(max_workers=workers, mp_context=mp.get_context("spawn"))
     except (OSError, ValueError, NotImplementedError, ImportError):
@@ -800,7 +801,7 @@ def _run_parallel(jobs: list, workers: int, cancel, on_result) -> list:
             if cancel is not None and cancel.is_set():
                 break
             while pending and len(inflight) < workers * 3:
-                job = pending.pop(0)
+                job = pending.popleft()
                 inflight[pool.submit(analysis.analyze_job, job[1], job[2], job[3])] = job
             done, _ = cf.wait(list(inflight), timeout=0.5, return_when=cf.FIRST_COMPLETED)
             for fut in done:
@@ -808,17 +809,19 @@ def _run_parallel(jobs: list, workers: int, cancel, on_result) -> list:
                 try:
                     res = fut.result()
                 except cf.process.BrokenProcessPool:
-                    pending.insert(0, job)
+                    pending.appendleft(job)
                     raise
                 except Exception as e:  # noqa: BLE001
                     res = (None, ["audio analysis failed: %s" % e])
                 on_result(job[0], res)
     except cf.process.BrokenProcessPool:
-        pending = [j for j in inflight.values()] + pending
+        pending.extendleft(reversed(list(inflight.values())))
         inflight.clear()
     finally:
+        # On cancel this still waits for the few files already handed to workers
+        # (at most workers * 3, each well under a second); queued ones are dropped.
         pool.shutdown(wait=True, cancel_futures=True)
-    return pending
+    return list(pending)
 
 
 def analyze_items(items: list, cache: dict, progress=None, cancel=None,
@@ -834,11 +837,12 @@ def analyze_items(items: list, cache: dict, progress=None, cancel=None,
     total = len(todo)
     state = {"done": 0}
 
-    def tick(it):
+    def tick(it, mark):
         state["done"] += 1
         n = state["done"]
         if n % 10 == 0 or n == total:
-            _prog(progress, phase="analyzing", done=n, total=total, current=it.get("rel_path", ""))
+            _prog(progress, phase="analyzing", done=n, total=total, current=it.get("rel_path", ""),
+                  eta_mark=mark)
 
     def apply(it, want, res, warns):
         if res is None:
@@ -859,7 +863,7 @@ def analyze_items(items: list, cache: dict, progress=None, cancel=None,
         if ck and ck in cache:
             used[ck] = cache[ck]
             apply(it, want, cache[ck], [])
-            tick(it)
+            tick(it, "cached")
             continue
         key = ck or "#%d" % i
         if key not in groups:
@@ -873,8 +877,10 @@ def analyze_items(items: list, cache: dict, progress=None, cancel=None,
             used[key] = res
         for it, want in groups.pop(key, []):
             apply(it, want, res, warns)
-            tick(it)
+            tick(it, "measuring")
 
+    # Cached files took no time: the time-left estimate starts counting from here.
+    _prog(progress, phase="analyzing", done=state["done"], total=total, eta_mark="measuring")
     jobs = order
     if analyzer is None and not (cancel is not None and cancel.is_set()):
         workers = analysis_workers(len(jobs))

@@ -29,7 +29,7 @@ jobs:
         run: |
           & .\python\python.exe tests\run_all.py
           exit $LASTEXITCODE
-      - name: Launcher starts the app on a PC with no Python on PATH
+      - name: Launcher starts the app on a PC with no Python on PATH, from a folder with ( ) and &
         if: runner.os == 'Windows' && matrix.python == '3.13'
         shell: pwsh
         run: |
@@ -37,14 +37,17 @@ jobs:
           Remove-Item Env:pythonLocation, Env:Python_ROOT_DIR, Env:Python3_ROOT_DIR, Env:PYTHONHOME, Env:PYTHONPATH -ErrorAction SilentlyContinue
           $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP "lad"
           New-Item -ItemType Directory -Force $env:LOCALAPPDATA | Out-Null
+          $app = Join-Path $env:RUNNER_TEMP "Sample Tool (1) & Co"
+          New-Item -ItemType Directory -Force $app | Out-Null
+          Copy-Item -Recurse python, samplelib, ui, "Launch Sample Organizer.bat" $app
           $log = Join-Path $env:RUNNER_TEMP "launcher.txt"
-          $p = Start-Process cmd.exe -ArgumentList '/c', 'call "Launch Sample Organizer.bat" --no-browser --port 8797' -PassThru -NoNewWindow -RedirectStandardOutput $log
+          $p = Start-Process cmd.exe -WorkingDirectory $app -ArgumentList '/c', 'call "Launch Sample Organizer.bat" --no-browser --port 8797' -PassThru -NoNewWindow -RedirectStandardOutput $log
           $s = $null
           for ($i = 0; $i -lt 60 -and -not $s; $i++) {
             try { $s = Invoke-RestMethod http://127.0.0.1:8797/api/settings } catch { Start-Sleep 1 }
           }
           Get-Content $log
-          Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$PWD\python\*" } | Stop-Process -Force
+          Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$app\python\*" } | Stop-Process -Force
           $p | Stop-Process -Force -ErrorAction SilentlyContinue
           if (-not $s) { throw "The launcher did not start the app" }
           $s.info.python | ConvertTo-Json

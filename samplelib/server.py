@@ -75,7 +75,8 @@ class Eta:
         use_bytes = p.get("phase") == "hashing" and (p.get("bytes_total") or 0) > 0
         done = (p.get("bytes_done") if use_bytes else p.get("done")) or 0
         total = (p.get("bytes_total") if use_bytes else p.get("total")) or 0
-        key = (p.get("seq"), p.get("job"), p.get("phase"), use_bytes)
+        # eta_mark lets a job restart the clock inside a step (after instant cached work).
+        key = (p.get("seq"), p.get("job"), p.get("phase"), p.get("eta_mark"), use_bytes)
         now = self.clock()
         if key != self.key or done < self.base:
             self.key, self.t0, self.base = key, now, done
@@ -391,6 +392,7 @@ class Handler(BaseHTTPRequestHandler):
                     extra.update(ext.state(app))
             return self._send(200, {**extra, "version": __version__,
                                     "root": st.root, "dest_root": st.dest_root, "data_dir": st.data_dir,
+                                    "root_exists": bool(st.root) and os.path.isdir(st.root),
                                     "scan_summary": ssum,
                                     "has_inventory": bool(st.items), "progress": app.get_progress(),
                                     "plan": plan, "execution": ex,

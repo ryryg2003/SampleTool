@@ -15,6 +15,7 @@
 .wl-step h2 { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
 .wl-step p { color: var(--muted); line-height: 1.5; font-size: 13px; }
 .wl-step p.mono { color: var(--text); font-size: 12.5px; }
+.wl-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .wl-step .btn { align-self: flex-start; height: 40px; padding: 0 20px; border-radius: 999px; }
 .wl-n {
   width: 34px; height: 34px; border-radius: 12px; display: grid; place-items: center; flex: none;

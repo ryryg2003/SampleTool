@@ -536,7 +536,7 @@ window.FixtureExt = window.FixtureExt || [];
     const p = u.pathname, q = u.searchParams;
     body = body || {};
     if (method === 'GET' && p === '/api/state') {
-      return ok({ root: st.root, dest_root: st.dest_root, data_dir: st.data_dir, has_inventory: st.has_inventory, progress: st.progress, fixture: true,
+      return ok({ root: st.root, root_exists: !!st.root, dest_root: st.dest_root, data_dir: st.data_dir, has_inventory: st.has_inventory, progress: st.progress, fixture: true,
         plan: st.plan && { plan_hash: st.plan.plan_hash, created: st.plan.created, stale: st.plan.stale, approved: st.plan.approved, summary: st.plan.summary },
         execution: st.execution });
     }

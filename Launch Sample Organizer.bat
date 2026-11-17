@@ -16,11 +16,11 @@ rem asks you to pick it). Set it to force a folder, e.g.
 rem   set "ROOT=D:\Music\Sample Packs"
 set "ROOT="
 
+rem The folder may contain spaces, ( ) or &: keep every path inside quotes and
+rem out of ( ) blocks, which cmd reads whole before running them.
 set "PY="
-if exist "%~dp0python\python.exe" (
-  "%~dp0python\python.exe" -c "import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)" >nul 2>nul
-  if not errorlevel 1 set "PY="%~dp0python\python.exe""
-)
+set "BUNDLED=%~dp0python\python.exe"
+if exist "%BUNDLED%" "%BUNDLED%" -c "import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)" >nul 2>nul && set PY="%BUNDLED%"
 if not defined PY (
   where py >nul 2>nul && set "PY=py -3"
 )

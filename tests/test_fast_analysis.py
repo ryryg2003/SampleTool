@@ -175,6 +175,37 @@ class ParallelAnalysisTest(unittest.TestCase):
         self.assertEqual(used, {})
         self.assertFalse(any("analysis" in i for i in items))
 
+    def test_cancel_while_workers_run(self):
+        stop = threading.Event()
+        got = []
+
+        def progress(p):
+            got.append(p)
+            if p.get("eta_mark") == "measuring" and p.get("done", 0) > 0:
+                stop.set()  # the user presses Cancel after the first results
+
+        with mock.patch.dict(os.environ, {"SLO_ANALYSIS_WORKERS": "2"}), \
+                mock.patch.object(classify, "PARALLEL_MIN_FILES", 1):
+            items = self.fresh()
+            for it in items:
+                it["sha256"] = None  # nothing cached or shared: 18 separate jobs
+            classify.analyze_items(items, {}, progress=progress, cancel=stop)
+        measured = sum(1 for i in items if "analysis" in i)
+        self.assertTrue(stop.is_set())
+        self.assertLess(measured, 18, "cancel stops handing out work")
+
+    def test_rescan_reports_cached_files_before_the_clock_starts(self):
+        with mock.patch.dict(os.environ, {"SLO_ANALYSIS_WORKERS": "1"}):
+            items = self.fresh()
+            cache = classify.analyze_items(items, {})
+            items = self.fresh()
+            seen = []
+            classify.analyze_items(items, cache, progress=seen.append)
+        marks = [p.get("eta_mark") for p in seen if p.get("phase") == "analyzing"]
+        self.assertIn("cached", marks)
+        self.assertEqual(marks[marks.index("measuring")], "measuring")
+        self.assertNotIn("cached", marks[marks.index("measuring"):], "cached work is reported first")
+
     def test_pool_that_cannot_start_falls_back(self):
         import concurrent.futures as cf
         with mock.patch.dict(os.environ, {"SLO_ANALYSIS_WORKERS": "2"}), \

@@ -237,6 +237,15 @@ class EtaTest(unittest.TestCase):
         self.assertAlmostEqual(self.eta.update(self.p(phase="hashing", done=1, total=10,
                                                       bytes_done=200, bytes_total=1000)), 8.0)
 
+    def test_mark_restarts_the_clock_after_cached_files(self):
+        # a rescan: 900 of 1000 come from the cache at once, then 100 need measuring
+        self.eta.update(self.p(done=0, total=1000, eta_mark="cached"))
+        self.t += 0.5
+        self.eta.update(self.p(done=900, total=1000, eta_mark="cached"))
+        self.assertIsNone(self.eta.update(self.p(done=900, total=1000, eta_mark="measuring")))
+        self.t += 10
+        self.assertAlmostEqual(self.eta.update(self.p(done=910, total=1000, eta_mark="measuring")), 90.0)
+
     def test_finished_or_idle_has_no_estimate(self):
         self.eta.update(self.p(done=0))
         self.t += 5
