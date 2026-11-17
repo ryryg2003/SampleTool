@@ -107,6 +107,8 @@ function url(hash) {
       await page.click(b); await settle();
       check(`filter toggle ${ft} sets and clears`, on && chip && (await page.getAttribute(b, 'aria-pressed')) === 'false');
     }
+    check('More panel closes when focus moves to search', await (async () => { await openMore(); await page.press('body', '/'); await settle(150); return page.isHidden('#lib-more-panel'); })());
+    await page.keyboard.press('Escape');
     await shot('01-library');
 
     // search (debounced)

@@ -131,6 +131,8 @@ const Library = {
     $('#lib-more').addEventListener('click', () => this.setMore($('#lib-more-panel').hidden));
     $('#lib-more-panel').addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); this.setMore(false); $('#lib-more').focus(); } });
     document.addEventListener('pointerdown', (ev) => { if (!$('#lib-more-panel').hidden && !ev.target.closest('.more-wrap')) this.setMore(false); });
+    // Typing or tabbing elsewhere (search with "/", another filter) closes it too.
+    $('.more-wrap').addEventListener('focusout', (ev) => { if (!ev.relatedTarget || !ev.relatedTarget.closest('.more-wrap')) this.setMore(false); });
     $('#lib-allfiles').checked = this.allFiles;
     $('#lib-allfiles').addEventListener('change', () => { this.allFiles = $('#lib-allfiles').checked; Store.set('lib.allFiles', this.allFiles); this.apply(); });
     $('#pack-q').addEventListener('input', debounce(() => this.loadPacks(), 150));
