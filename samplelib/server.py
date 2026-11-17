@@ -25,7 +25,7 @@ from .store import Store
 #   post(handler, path, b) -> bool  return True when it handled (and answered) the POST
 #   MUTATING: set[str]              POST paths refused while an approved run is executing
 #   state(app) -> dict              extra keys merged into GET /api/state
-EXTENSION_NAMES = ("undo", "media", "collections", "settings")
+EXTENSION_NAMES = ("undo", "media", "collections", "settings", "folders")
 
 
 def _load_extensions() -> list:
@@ -49,6 +49,45 @@ AUDIO_TYPES = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg",
                ".aiff": "audio/aiff", ".aifc": "audio/aiff"}
 
 
+# Scan steps as the user sees them ("Step 2 of 5"). Reading tags and classifying are one step.
+SCAN_STEPS = {"walking": 1, "hashing": 2, "metadata": 3, "classifying": 3, "analyzing": 4, "kits": 5}
+SCAN_STEP_COUNT = 5
+ETA_MIN_ELAPSED = 2.0  # seconds of a step before a time-left estimate is shown
+
+
+class Eta:
+    """Time left in the current step, from the average rate since the step began.
+
+    Works on whatever the job reports: bytes while fingerprinting (files vary a
+    lot in size), file counts otherwise. Returns None until it has enough to go on.
+    """
+
+    def __init__(self, clock=time.monotonic):
+        self.clock = clock
+        self.key = None
+        self.t0 = 0.0
+        self.base = 0
+
+    def update(self, p: dict) -> Optional[float]:
+        if not p.get("running"):
+            self.key = None
+            return None
+        use_bytes = p.get("phase") == "hashing" and (p.get("bytes_total") or 0) > 0
+        done = (p.get("bytes_done") if use_bytes else p.get("done")) or 0
+        total = (p.get("bytes_total") if use_bytes else p.get("total")) or 0
+        key = (p.get("seq"), p.get("job"), p.get("phase"), use_bytes)
+        now = self.clock()
+        if key != self.key or done < self.base:
+            self.key, self.t0, self.base = key, now, done
+            return None
+        if total <= 0 or done >= total:
+            return None
+        elapsed, moved = now - self.t0, done - self.base
+        if elapsed < ETA_MIN_ELAPSED or moved <= 0:
+            return None
+        return round((total - done) * elapsed / moved, 1)
+
+
 class App:
     """Owns the store and the single background job slot."""
 
@@ -58,8 +97,10 @@ class App:
         self.cancel = threading.Event()
         self.progress: dict = {"seq": 0, "job": "idle", "phase": "", "running": False, "done": 0,
                                "total": 0, "bytes_done": 0, "bytes_total": 0, "current": "",
-                               "warnings": 0, "errors": [], "message": ""}
+                               "warnings": 0, "errors": [], "message": "",
+                               "eta_s": None, "step": None, "steps": None}
         self._plock = threading.Lock()
+        self._eta = Eta()
         self.executing = False  # true for the whole approved run incl. reports
 
     # ------------------------------------------------------------ progress
@@ -69,6 +110,10 @@ class App:
             self.progress.update(p)
             if "errors" in p and p["errors"] is not errs:
                 self.progress["errors"] = list(p["errors"])[-200:]
+            pr = self.progress
+            pr["eta_s"] = self._eta.update(pr)
+            step = SCAN_STEPS.get(pr.get("phase")) if pr.get("job") == "scan" and pr.get("running") else None
+            pr["step"], pr["steps"] = (step, SCAN_STEP_COUNT) if step else (None, None)
 
     def get_progress(self) -> dict:
         with self._plock:

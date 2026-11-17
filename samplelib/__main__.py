@@ -40,7 +40,8 @@ def _open_window(url: str) -> None:
 
 def _parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="samplelib", description="Sample Library Organizer")
-    ap.add_argument("--root", default="", help=r'Collection folder, e.g. "E:\Sample Packs" (default: the saved one)')
+    ap.add_argument("--root", default="", help=r'Collection folder, e.g. "D:\Music\Sample Packs" (default: the saved one; '
+                    'the first run asks for it)')
     ap.add_argument("--port", type=int, default=None, help="Port (default: the one saved in Settings, else 8765)")
     ap.add_argument("--data-dir", default=default_data_dir())
     ap.add_argument("--no-browser", action="store_true")

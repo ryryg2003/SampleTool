@@ -89,7 +89,8 @@ const Settings = {
           <h2 class="set-h" id="set-col-h">Collection folder</h2>
           <label class="field-label" for="set-root">Folder that holds your sample packs</label>
           <div class="set-row">
-            <input id="set-root" class="input input-path" type="text" spellcheck="false" autocomplete="off">
+            <input id="set-root" class="input input-path" type="text" spellcheck="false" autocomplete="off" placeholder="Choose a folder, or paste its path">
+            <button class="btn" id="set-pick" type="button">Choose…</button>
             <button class="btn btn-primary" id="set-switch" type="button">Switch and scan</button>
           </div>
           <p class="set-help" id="set-root-help">Switching starts a read-only scan of the new folder. The plan and any approval for the current folder are cleared.</p>

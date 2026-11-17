@@ -275,9 +275,11 @@ window.FixtureExt = window.FixtureExt || [];
   recomputeDups();
 
   // ---- Plan ---------------------------------------------------------------
+  // ?firstrun=1 starts like a fresh install: no folder picked, nothing scanned.
+  const FIRST_RUN = new URLSearchParams(location.search).get('firstrun') === '1';
   const st = {
-    root: ROOT, dest_root: DEST, data_dir: 'C:\\Users\\Producer\\AppData\\Local\\SampleOrganizer',
-    has_inventory: true,
+    root: FIRST_RUN ? '' : ROOT, dest_root: DEST, data_dir: 'C:\\Users\\Producer\\AppData\\Local\\SampleOrganizer',
+    has_inventory: !FIRST_RUN,
     progress: { job: 'idle', phase: 'idle', running: false, done: 0, total: 0, bytes_done: 0, bytes_total: 0, current: '', warnings: 0, errors: [], message: '' },
     plan: null, execution: null, ops: [], results: [],
   };
@@ -376,7 +378,8 @@ window.FixtureExt = window.FixtureExt || [];
   let jobTimer = null;
   function runJob(job, phases, total, onDone) {
     const p = st.progress;
-    Object.assign(p, { job, running: true, done: 0, total, bytes_done: 0, bytes_total: total * 2400000, warnings: 0, errors: [], message: '', phase: phases[0], current: '' });
+    Object.assign(p, { job, running: true, done: 0, total, bytes_done: 0, bytes_total: total * 2400000, warnings: 0, errors: [], message: '', phase: phases[0], current: '',
+      eta_s: null, step: job === 'scan' ? 1 : null, steps: job === 'scan' ? 5 : null });
     let tick = 0;
     clearInterval(jobTimer);
     jobTimer = setInterval(() => {
@@ -384,13 +387,17 @@ window.FixtureExt = window.FixtureExt || [];
       p.done = Math.min(total, p.done + Math.ceil(total / 18));
       p.bytes_done = Math.round(p.bytes_total * p.done / total);
       p.phase = phases[Math.min(phases.length - 1, Math.floor(p.done / total * phases.length))];
+      // Same fields the real server sends: time left (after a moment) and the scan step.
+      p.eta_s = tick >= 3 ? Math.round((total - p.done) / Math.ceil(total / 18) * 0.16 * 10) / 10 : null;
+      p.step = job === 'scan' ? ({ walking: 1, hashing: 2, metadata: 3, classifying: 3, analyzing: 4, kits: 5 })[p.phase] || null : null;
+      p.steps = p.step ? 5 : null;
       const it = items[(tick * 37) % items.length];
       p.current = it.abs_path;
       if (tick % 4 === 0) { p.warnings++; }
       if (tick === 7 && job === 'scan') p.errors.push({ path: win('Static Garden - Tape Hiss Botany/Extras/locked_take.wav'), error: 'Permission denied while hashing; file skipped' });
       if (p.done >= total) {
         clearInterval(jobTimer); jobTimer = null;
-        Object.assign(p, { running: false, phase: 'complete', current: '', message: job + ' finished' });
+        Object.assign(p, { running: false, phase: 'complete', current: '', message: job + ' finished', eta_s: null, step: null, steps: null });
         onDone && onDone();
         setTimeout(() => { if (!p.running) p.job = 'idle'; }, 200);
       }

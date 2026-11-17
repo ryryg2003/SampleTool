@@ -51,7 +51,12 @@ const Shell = {
       const job = this.lastJob;
       await App.refreshState();
       await App.refreshFacets();
-      if (job === 'scan') { Library.packsLoaded = false; Library.loadPacks(); Library.table.reset(); Scan.renderSummary(); toast(p.phase === 'cancelled' ? 'Scan cancelled. Nothing was changed.' : 'Scan finished'); }
+      if (job === 'scan') {
+        Library.packsLoaded = false; Library.loadPacks(); Library.table.reset(); Scan.renderSummary();
+        const firstRun = typeof Welcome === 'object' && Welcome.active && App.state && App.state.has_inventory;
+        toast(p.phase === 'cancelled' ? 'Scan cancelled. Nothing was changed.' : firstRun ? 'Scan finished. Try Beat Starter next.' : 'Scan finished');
+        if (firstRun && App.view === 'scan') { Welcome.render(); $('#wl-starter').focus(); }
+      }
       App.emit('job-done', job);
     } else if (!this.lastRunning && p.running) {
       App.refreshState();
@@ -65,7 +70,8 @@ const Shell = {
     led.className = 'sb-led' + (p.running ? ' run' : '') + (p.errors && p.errors.length ? ' warn' : '');
     const phase = PHASE_LABEL[p.phase] || p.phase || '';
     $('#sb-job').textContent = p.running ? `${JOB_LABEL[p.job] || p.job}${phase ? ': ' + phase : ''}` : (p.message || 'Idle');
-    $('#sb-count').textContent = p.running && p.total ? `${Fmt.num(p.done)} / ${Fmt.num(p.total)}${p.bytes_total ? '  ' + Fmt.bytes(p.bytes_done) + ' / ' + Fmt.bytes(p.bytes_total) : ''}` : '';
+    const left = typeof progressLeft === 'function' ? progressLeft(p) : '';
+    $('#sb-count').textContent = p.running && p.total ? `${Fmt.num(p.done)} / ${Fmt.num(p.total)}${p.bytes_total ? '  ' + Fmt.bytes(p.bytes_done) + ' / ' + Fmt.bytes(p.bytes_total) : ''}${left ? '  · ' + left : ''}` : '';
     const nerr = (p.errors || []).length;
     $('#sb-warn').textContent = p.warnings ? `${Fmt.num(p.warnings)} warning${p.warnings === 1 ? '' : 's'}` : '';
     $('#sb-warn').hidden = !p.warnings;
@@ -93,8 +99,13 @@ const Scan = {
     });
   },
   async start() {
-    const root = $('#scan-root').value.trim();
-    if (!root) { toast('Enter the folder that holds your sample packs', 'err'); $('#scan-root').focus(); return; }
+    let root = $('#scan-root').value.trim();
+    if (!root && typeof FolderPicker === 'object') {
+      root = await FolderPicker.open('');
+      if (!root) return;
+      $('#scan-root').value = root; this.edited = true;
+    }
+    if (!root) { toast('Choose the folder that holds your sample packs', 'err'); $('#scan-root').focus(); return; }
     try {
       await API.post('/api/scan', { root });
       toast('Scan started. Nothing in this folder will be changed.');
@@ -112,9 +123,11 @@ const Scan = {
     $('#scan-start').textContent = scanning ? 'Scanning…' : 'Start read-only scan';
     $('#scan-cancel').hidden = !scanning;
     $('#scan-progress').hidden = !showPanel;
-    if (!showPanel) return;
+    if (!showPanel) { if (typeof Welcome === 'object') Welcome.render(); return; }
     const pct = p.total ? Math.min(100, p.done / p.total * 100) : 0;
     $('#sp-phase').textContent = scanning ? (PHASE_LABEL[p.phase] || p.phase || 'Working') : (PHASE_LABEL[p.phase] || p.phase || 'Finished');
+    $('#sp-step').textContent = scanning && p.step && p.steps ? `Step ${p.step} of ${p.steps}` : '';
+    $('#sp-eta').textContent = scanning && typeof progressLeft === 'function' ? progressLeft(p) : '';
     $('#sp-count').textContent = `${Fmt.num(p.done)} / ${Fmt.num(p.total)} files`;
     $('#sp-bytes').textContent = p.bytes_total ? `${Fmt.bytes(p.bytes_done)} of ${Fmt.bytes(p.bytes_total)}` : '';
     $('#sp-bar').style.width = pct + '%';
@@ -128,11 +141,12 @@ const Scan = {
     $('#sp-err').classList.toggle('is-zero', !errs.length);
     $('#sp-warn').classList.toggle('is-zero', !p.warnings);
     $('#sp-errors').innerHTML = errs.map((e) => `<li><code class="ellip" title="${esc(e.path)}">${esc(e.path)}</code><span>${esc(e.error)}</span></li>`).join('');
+    if (typeof Welcome === 'object') Welcome.render();
   },
   async renderSummary() {
     const box = $('#scan-summary');
     const s = App.state;
-    if (!s || !s.has_inventory) { box.innerHTML = '<div class="empty empty-scan"><strong>No scan yet.</strong><p>Point the scan at the folder that holds your packs. You will review everything before a single file moves.</p></div>'; return; }
+    if (!s || !s.has_inventory) { box.innerHTML = '<div class="empty empty-scan"><strong>No scan yet.</strong><p>Choose the folder that holds your packs and start a scan. You will review everything before a single file moves.</p></div>'; return; }
     let packs = [];
     try { packs = await API.get('/api/packs'); } catch (e) { /* show what we have */ }
     const ss = s.scan_summary || {};
@@ -156,8 +170,9 @@ const Scan = {
       ${ss.new_files !== undefined ? `<div class="card c-new${ss.new_files ? ' has-new' : ' card-info'}" title="Files that arrived after the last approved run (on the first scan nothing counts as new)"><span class="card-k">new since last run</span><span class="card-v mono">${Fmt.num(ss.new_files)}</span>${ss.new_files ? `<span class="card-s mono">${Fmt.num(ss.new_packs)} pack${ss.new_packs === 1 ? '' : 's'}${ss.new_bytes ? ' · ' + Fmt.bytes(ss.new_bytes) : ''}</span>` : ''}<span class="card-bar" aria-hidden="true"><i style="--p:${files ? Math.min(100, Math.round((ss.new_files || 0) / files * 100)) : 0}%"></i></span></div>` : ''}
     </div>
     ${!ss.duplicate_groups && !s.plan ? '<p class="hint">Duplicate, collision and hold counts appear once a plan is built.</p>' : ''}
-    <div class="next-step"><button class="btn btn-primary" type="button" id="scan-to-lib">Browse library</button><button class="btn" type="button" id="scan-to-review">Review plan</button>${ss.new_files ? `<button class="btn" type="button" id="scan-plan-new" title="Only new files get moved; everything else is kept where it is for a later plan. You still review and approve.">Plan only new files (${Fmt.num(ss.new_files)})</button><button class="btn btn-ghost" type="button" id="scan-see-new">Show new files</button>` : ''}</div>`;
+    <div class="next-step"><button class="btn btn-primary" type="button" id="scan-to-starter">Try Beat Starter</button><button class="btn" type="button" id="scan-to-lib">Browse library</button><button class="btn" type="button" id="scan-to-review">Review plan</button>${ss.new_files ? `<button class="btn" type="button" id="scan-plan-new" title="Only new files get moved; everything else is kept where it is for a later plan. You still review and approve.">Plan only new files (${Fmt.num(ss.new_files)})</button><button class="btn btn-ghost" type="button" id="scan-see-new">Show new files</button>` : ''}</div>`;
     $('#scan-to-lib').onclick = () => Shell.go('library');
+    $('#scan-to-starter').onclick = () => { if (typeof Welcome === 'object') Welcome.finish(); Shell.go('starter'); };
     if ($('#scan-plan-new')) $('#scan-plan-new').onclick = () => Collections.planOnlyNew();
     if ($('#scan-see-new')) $('#scan-see-new').onclick = () => { Library.clearAll(); Library.setNewOnly(true); Shell.go('library'); };
     $('#scan-to-review').onclick = () => Shell.go('review');

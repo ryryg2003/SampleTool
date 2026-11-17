@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="collections.css">
 <link rel="stylesheet" href="undo.css">
 <link rel="stylesheet" href="settings.css">
+<link rel="stylesheet" href="firstrun.css">
 <link rel="stylesheet" href="motion.css">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 </head>
@@ -71,16 +72,22 @@
     <section class="view view-scan" id="view-scan" aria-labelledby="scan-h" hidden>
       <header class="view-head head-card vh-card">
         <div class="vh-text">
-          <span class="vh-eyebrow">Scan</span>
+          <span class="vh-eyebrow" id="scan-eyebrow">Scan</span>
           <h1 id="scan-h">Scan</h1>
-          <p class="view-sub">Read every file under your packs folder and work out what each sound is.</p>
+          <p class="view-sub" id="scan-sub">Read every file under your packs folder and work out what each sound is.</p>
         </div>
       </header>
       <div class="scan-body">
+        <ol class="welcome" id="welcome" aria-label="Get started" hidden>
+          <li class="wl-step panel glass" id="wl-1"><span class="wl-n" aria-hidden="true">1</span><div class="wl-text"><h2>Pick your sample folder</h2><p id="wl-folder"></p></div><button class="btn btn-primary" type="button" id="wl-pick">Choose folder…</button></li>
+          <li class="wl-step panel glass" id="wl-2"><span class="wl-n" aria-hidden="true">2</span><div class="wl-text"><h2>Scan it</h2><p id="wl-scan-text"></p></div><button class="btn" type="button" id="wl-scan" disabled>Start scan</button></li>
+          <li class="wl-step panel glass" id="wl-3"><span class="wl-n" aria-hidden="true">3</span><div class="wl-text"><h2>Try Beat Starter</h2><p>Get a drum loop, bass and melody that fit together, then play them all at once.</p></div><button class="btn" type="button" id="wl-starter" disabled>Try Beat Starter</button></li>
+        </ol>
         <form class="scan-form panel glass" id="scan-form">
           <label for="scan-root" class="field-label">Packs folder</label>
           <div class="scan-row">
-            <input id="scan-root" class="input input-path" type="text" spellcheck="false" autocomplete="off">
+            <input id="scan-root" class="input input-path" type="text" spellcheck="false" autocomplete="off" placeholder="Choose a folder, or paste its path">
+            <button class="btn btn-big" id="scan-pick" type="button">Choose…</button>
             <button class="btn btn-primary btn-big" id="scan-start" type="submit">Start read-only scan</button>
             <button class="btn btn-danger" id="scan-cancel" type="button" hidden>Cancel scan</button>
           </div>
@@ -88,9 +95,11 @@
         </form>
         <div class="panel glass scan-progress" id="scan-progress" hidden>
           <div class="sp-top">
+            <span class="sp-step mono" id="sp-step"></span>
             <span class="sp-phase" id="sp-phase">walking</span>
             <span class="sp-count mono" id="sp-count">0 / 0</span>
             <span class="sp-bytes mono" id="sp-bytes"></span>
+            <span class="sp-eta" id="sp-eta" aria-live="polite"></span>
           </div>
           <div class="meter" role="progressbar" aria-label="Scan progress" aria-valuemin="0" aria-valuemax="100" id="sp-meter"><i id="sp-bar"></i></div>
           <div class="sp-current mono ellip" id="sp-current"></div>
@@ -422,6 +431,7 @@
 <script src="collections.js"></script>
 <script src="undo.js"></script>
 <script src="settings.js"></script>
+<script src="firstrun.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

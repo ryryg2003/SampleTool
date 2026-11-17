@@ -1,0 +1,75 @@
+/* firstrun.css: first-run welcome steps (Scan screen), the folder picker
+   dialog and the scan time-left line. Prism Aurora tokens only (docs/UI_PLAN.md). */
+
+/* ---------- Welcome: three step cards ---------- */
+.welcome { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); counter-reset: none; }
+.wl-step {
+  position: relative; display: flex; flex-direction: column; gap: 14px; padding: 20px 22px; min-width: 0;
+  border-radius: var(--r-card); transition: border-color .15s ease, box-shadow .15s ease, opacity .15s ease;
+  animation: wl-in .32s ease both;
+}
+.wl-step:nth-child(2) { animation-delay: .02s; }
+.wl-step:nth-child(3) { animation-delay: .04s; }
+@keyframes wl-in { from { opacity: 0; transform: translateY(6px); } }
+.wl-step .wl-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.wl-step h2 { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+.wl-step p { color: var(--muted); line-height: 1.5; font-size: 13px; }
+.wl-step p.mono { color: var(--text); font-size: 12.5px; }
+.wl-step .btn { align-self: flex-start; height: 40px; padding: 0 20px; border-radius: 999px; }
+.wl-n {
+  width: 34px; height: 34px; border-radius: 12px; display: grid; place-items: center; flex: none;
+  font: 800 15px var(--f-label); color: var(--muted); background: var(--raised); border: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.wl-step.is-current {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: var(--card-shadow), 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent), 0 0 40px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.wl-step.is-current .wl-n { background: var(--grad); color: var(--on-accent); border-color: transparent; box-shadow: var(--glow); }
+.wl-step.is-done .wl-n { background: color-mix(in srgb, var(--ok) 18%, transparent); border-color: color-mix(in srgb, var(--ok) 50%, transparent); color: var(--ok); font-size: 0; }
+.wl-step.is-done .wl-n::before { content: "\2713"; font-size: 16px; }
+.wl-step:not(.is-current):not(.is-done) { opacity: .62; }
+
+/* ---------- Scan progress: step and time left ---------- */
+.sp-step { color: var(--muted); font-size: 12px; padding: 2px 8px; border-radius: var(--r-tag); background: var(--raised); border: 1px solid var(--line); }
+.sp-step:empty, .sp-eta:empty { display: none; }
+.sp-eta { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.scan-row #scan-pick { padding: 0 20px; border-radius: 999px; }
+
+/* ---------- Folder picker ---------- */
+.dlg-folder { width: min(680px, calc(100vw - 32px)); }
+.dlg-folder .dlg-body { max-height: calc(100vh - 40px); }
+.fp-places { display: flex; flex-wrap: wrap; gap: 6px; }
+.fp-place {
+  height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--field);
+  color: var(--muted); cursor: pointer; font-size: 12.5px; transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.fp-place:hover { background: var(--raised); color: var(--text); }
+.fp-place.on { background: var(--sel); border-color: var(--sel-line); color: var(--text); }
+.fp-place:focus-visible { outline: none; box-shadow: var(--focus); }
+.fp-bar { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.fp-bar .input-path { flex: 1; min-width: 0; height: 32px; font-size: 12.5px; }
+.fp-list {
+  list-style: none; margin: 0; padding: 6px; height: min(300px, 40vh); overflow-y: auto;
+  border-radius: var(--r-in); background: var(--field); border: 1px solid var(--line);
+}
+.fp-item {
+  width: 100%; display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--text); cursor: pointer; text-align: left; transition: background .15s ease;
+}
+.fp-item:hover { background: var(--raised); }
+.fp-item:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
+.fp-item svg { width: 18px; height: 18px; flex: none; color: var(--cat-bass); }
+.fp-item .ellip { flex: 1; }
+.fp-item .fp-chev { width: 14px; height: 14px; color: var(--muted); }
+.fp-none { color: var(--muted); padding: 12px 10px; }
+.fp-info { font-size: 12.5px; }
+
+@media (max-width: 1100px) {
+  .welcome { grid-template-columns: minmax(0, 1fr); }
+  .wl-step { flex-direction: row; align-items: center; flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wl-step { animation: none; transition: none; }
+}
+.sp-bytes:empty + .sp-eta { margin-left: auto; }

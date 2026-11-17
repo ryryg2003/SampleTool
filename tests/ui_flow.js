@@ -28,6 +28,7 @@ async function waitIdle(timeout = 60000) {
 
 (async () => {
   execFileSync(PY, [path.join(REPO, 'tools', 'make_fixtures.py'), root], { stdio: 'ignore' });
+  let first = null;
   const srv = spawn(PY, ['-m', 'samplelib', '--root', root, '--data-dir', path.join(tmp, 'data'), '--port', String(PORT), '--no-browser'], { cwd: REPO, stdio: 'ignore' });
   for (let i = 0; i < 300; i++) { try { await api('/api/state'); break; } catch { await sleep(200); } }
   const browser = await chromium.launch();
@@ -291,6 +292,49 @@ async function waitIdle(timeout = 60000) {
     // <<< settings checks
     //
     //
+    // >>> first run: fresh app data, no saved folder -> pick it, scan, Try Beat Starter
+    {
+      const FPORT = PORT + 100;
+      const fdata = path.join(tmp, 'data-first');
+      first = spawn(PY, ['-m', 'samplelib', '--data-dir', fdata, '--port', String(FPORT), '--no-browser'], { cwd: REPO, stdio: 'ignore' });
+      const fapi = (p) => new Promise((res, rej) => http.get(`http://127.0.0.1:${FPORT}${p}`, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => { try { res(JSON.parse(b)); } catch (e) { rej(e); } }); }).on('error', rej));
+      for (let i = 0; i < 300; i++) { try { await fapi('/api/state'); break; } catch { await sleep(200); } }
+      check('first run: no folder is preset', (await fapi('/api/state')).root === '');
+      const fp = await browser.newPage({ viewport: { width: 1366, height: 768 } });
+      fp.on('pageerror', (e) => errors.push('first run: ' + e.message));
+      fp.on('console', (m) => { if (m.type() === 'error') errors.push('first run: ' + m.text()); });
+      await fp.goto(`http://127.0.0.1:${FPORT}/`, { waitUntil: 'load' });
+      await fp.waitForSelector('#welcome:not([hidden])', { timeout: 10000 });
+      check('first run: the welcome steps show', /three steps/.test(await fp.textContent('#scan-h')));
+      await fp.click('#wl-pick');
+      await fp.waitForSelector('#folder-dlg[open]');
+      await fp.waitForSelector('#fp-list .fp-item');
+      check('first run: picker lists real drives or places', (await fp.locator('#fp-list .fp-item').count()) > 0);
+      await fp.fill('#fp-path', path.dirname(root));
+      await fp.press('#fp-path', 'Enter');
+      await fp.locator('#fp-list .fp-item', { hasText: /^Sample Packs$/ }).click();
+      await fp.waitForFunction((r) => document.getElementById('fp-path').value === r, root);
+      check('first run: picker counts the folders inside', /\d+ folders?/.test(await fp.textContent('#fp-info')));
+      await fp.screenshot({ path: path.join(shotDir, 'flow-09-first-run-picker.png') });
+      await fp.click('#fp-use');
+      await fp.waitForFunction((r) => document.getElementById('scan-root').value === r, root, { timeout: 5000 }).catch(() => {});
+      check('first run: picked folder fills in', (await fp.inputValue('#scan-root')) === root, await fp.inputValue('#scan-root'));
+      await fp.click('#wl-scan');
+      await fp.waitForFunction(() => !document.getElementById('wl-starter').disabled, null, { timeout: 60000 });
+      await sleep(500);
+      const fst = await fapi('/api/state');
+      check('first run: scan found the files', fst.root === root && fst.counts.files > 30, JSON.stringify(fst.counts));
+      check('first run: folder remembered for next launch', (await fapi('/api/settings')).settings.root === root);
+      await fp.screenshot({ path: path.join(shotDir, 'flow-10-first-run-done.png') });
+      await fp.click('#wl-starter');
+      await fp.waitForSelector('#view-starter:not([hidden])');
+      await fp.waitForFunction(() => document.querySelectorAll('#bs-slots > *').length === 3, null, { timeout: 10000 });
+      await sleep(600);
+      check('first run: Beat Starter offers a set', (await fp.evaluate(() => App.view)) === 'starter');
+      await fp.screenshot({ path: path.join(shotDir, 'flow-11-first-run-starter.png') });
+      await fp.close();
+    }
+    // <<< first run
   } catch (e) {
     check('flow ran to completion', false, e.message);
     await shot('flow-error').catch(() => {});
@@ -298,6 +342,7 @@ async function waitIdle(timeout = 60000) {
     check('no console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
     await browser.close();
     srv.kill();
+    if (first) first.kill();
     try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
     console.log(`\nscreenshots: ${shotDir}\n${failures ? failures + ' FAILED' : 'ALL PASSED'}`);
     process.exit(failures ? 1 : 0);
