@@ -193,7 +193,7 @@
           <div class="lib-title">
             <span class="lib-eyebrow" aria-hidden="true">Library</span>
             <h1 id="lib-h">Full library</h1>
-            <span class="lib-sub" id="lib-sub"></span>
+            <span class="lib-sub"><span id="lib-sub"></span><span class="lib-count mono" id="lib-count"></span></span>
           </div>
           <div class="lib-search">
             <div class="search search-lg"><svg aria-hidden="true"><use href="#i-search"/></svg><input class="input" id="lib-q" type="search" placeholder="Search name, pack, maker, instrument, kit, BPM, key, genre, tags" aria-label="Search samples" autocomplete="off" spellcheck="false"><kbd>/</kbd></div>
@@ -206,24 +206,30 @@
         <div id="lib-sounds" class="lib-sounds" role="tabpanel">
           <div class="lib-stats" id="lib-stats" role="group" aria-label="Filter by category"></div>
           <div class="lib-filterbar">
-          <div class="filters" id="lib-filters" aria-label="Filters">
+          <div class="filters" id="lib-filters" role="group" aria-label="Filters">
             <select class="input" data-f="category" aria-label="Category"><option value="">Category</option></select>
             <select class="input" data-f="instrument" aria-label="Instrument"><option value="">Instrument</option></select>
-            <select class="input" data-f="loop_type" aria-label="Loop type"><option value="">Loop / one-shot</option></select>
+            <select class="input" data-f="loop_type" aria-label="Loop or one-shot"><option value="">Type</option></select>
             <select class="input" data-f="key" aria-label="Key"><option value="">Key</option></select>
             <select class="input" data-f="genre" aria-label="Genre"><option value="">Genre</option></select>
-            <select class="input" data-f="manufacturer" aria-label="Manufacturer"><option value="">Maker</option></select>
             <span class="bpm-range"><input class="input mono" data-f="bpm_min" type="number" min="0" max="999" placeholder="BPM" aria-label="Minimum BPM"><span aria-hidden="true">–</span><input class="input mono" data-f="bpm_max" type="number" min="0" max="999" placeholder="max" aria-label="Maximum BPM"></span>
-            <button type="button" class="fbtn" data-ft="key_compat" aria-pressed="false" title="With a key picked, also show its relative major/minor (for example Am with C)">Compatible keys</button>
-            <button type="button" class="fbtn" data-ft="bpm_half" aria-pressed="false" title="With a BPM range, also match loops at half or double that tempo">Include half/double</button>
-            <button type="button" class="fbtn" data-ft="verified" aria-pressed="false" title="Only samples whose BPM, key and genre come from tags, names, folders or your edits, with no audio disagreement">Verified only</button>
-            <button type="button" class="fbtn" id="lib-new" aria-pressed="false" title="Files that arrived after the last approved run (or the first scan)">New since last run <b class="mono" id="lib-new-n"></b></button>
-            <select class="input" data-f="status" aria-label="Review status"><option value="">Status</option><option value="ok">OK</option><option value="needs-review">Needs review</option><option value="edited">Edited</option><option value="held">Held</option><option value="excluded">Excluded</option><option value="done">Organized</option></select>
+            <div class="more-wrap">
+              <button type="button" class="fbtn more-btn" id="lib-more" aria-expanded="false" aria-controls="lib-more-panel" aria-label="More filters" title="More filters: maker, status, compatible keys, half/double tempo, verified, new files, all file types">More <b class="mono" id="lib-more-n"></b><svg aria-hidden="true"><use href="#i-chev"/></svg></button>
+              <div class="more-panel" id="lib-more-panel" role="group" aria-label="More filters" hidden>
+                <div class="more-sel">
+                  <select class="input" data-f="manufacturer" aria-label="Maker"><option value="">Maker</option></select>
+                  <select class="input" data-f="status" aria-label="Review status"><option value="">Status</option><option value="ok">OK</option><option value="needs-review">Needs review</option><option value="edited">Edited</option><option value="held">Held</option><option value="excluded">Excluded</option><option value="done">Organized</option></select>
+                </div>
+                <button type="button" class="fbtn" data-ft="key_compat" aria-pressed="false" title="With a key picked, also show its relative major/minor (for example Am with C)">Compatible keys</button>
+                <button type="button" class="fbtn" data-ft="bpm_half" aria-pressed="false" title="With a BPM range, also match loops at half or double that tempo">Include half/double</button>
+                <button type="button" class="fbtn" data-ft="verified" aria-pressed="false" title="Only samples whose BPM, key and genre come from tags, names, folders or your edits, with no audio disagreement">Verified only</button>
+                <button type="button" class="fbtn" id="lib-new" aria-pressed="false" title="Files that arrived after the last approved run (or the first scan)">New since last run <b class="mono" id="lib-new-n"></b></button>
+                <label class="check check-sm" title="By default only audio, MIDI and presets are listed. Tick to include artwork, documents and other files."><input type="checkbox" id="lib-allfiles"> Show all files</label>
+              </div>
+            </div>
           </div>
-          <div class="chips-row" id="lib-chips-row">
+          <div class="chips-row" id="lib-chips-row" hidden>
             <div class="chips" id="lib-chips"></div>
-            <span class="count mono" id="lib-count"></span>
-            <label class="check check-sm" title="By default only audio, MIDI and presets are listed. Tick to include artwork, documents and other files."><input type="checkbox" id="lib-allfiles"> Show all files</label>
             <button class="btn btn-small btn-ghost" id="lib-save-smart" hidden title="Save this search and these filters as a smart collection">Save search…</button>
             <button class="btn btn-small btn-ghost" id="lib-clear" hidden>Clear all filters</button>
           </div>

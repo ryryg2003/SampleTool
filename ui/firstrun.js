@@ -135,6 +135,8 @@ const Welcome = {
     $('#wl-scan').focus();
   },
   finish() { this.active = false; this.render(); },
+  /* From Settings: walk through the steps again (keeps the current folder). */
+  reopen() { this.active = true; this.render(); Shell.go('scan'); },
   render() {
     const box = $('#welcome'); if (!box) return;
     const s = App.state || {};

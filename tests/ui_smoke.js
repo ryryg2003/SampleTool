@@ -47,6 +47,8 @@ function url(hash) {
   const rows = '#lib-table .vt-row:not(.is-ph)';
   const countOf = async (sel) => parseInt(((await page.textContent(sel)) || '0').replace(/[^\d]/g, ''), 10) || 0;
   const settle = (ms) => page.waitForTimeout(ms || 350);
+  // The less used filters live in the "More filters" panel; open it before using them.
+  const openMore = async () => { if (await page.isHidden('#lib-more-panel')) { await page.click('#lib-more'); await page.waitForSelector('#lib-more-panel', { state: 'visible' }); } };
 
   try {
     // ---------- Play all clock (pure math from ui/mixclock.js, no browser) ----------
@@ -78,11 +80,30 @@ function url(hash) {
     check('library loads rows', total0 > 0, `count=${total0}`);
     check('no horizontal page overflow (library)', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     check('nav always visible', (await page.locator('.rail-btn').count()) === 6);
+    {
+      const bar = await page.evaluate(() => {
+        const kids = [...document.getElementById('lib-filters').children].filter((k) => k.offsetParent !== null);
+        const tops = kids.map((k) => Math.round(k.getBoundingClientRect().top));
+        const f = document.getElementById('lib-filters');
+        return { n: kids.length, spread: Math.max(...tops) - Math.min(...tops), h: f.getBoundingClientRect().height, over: f.scrollWidth > f.clientWidth + 1 };
+      });
+      check('filter bar fits one row at 1366 px', bar.n >= 7 && bar.spread <= 2 && bar.h <= 40 && !bar.over, JSON.stringify(bar));
+      check('no chips row while nothing is filtered', await page.isHidden('#lib-chips-row'));
+      check('More filters panel starts closed', await page.isHidden('#lib-more-panel') && (await page.getAttribute('#lib-more', 'aria-expanded')) === 'false');
+      await page.click('#lib-more');
+      check('More opens the panel', await page.isVisible('#lib-more-panel') && (await page.getAttribute('#lib-more', 'aria-expanded')) === 'true');
+      await shot('01b-library-more');
+      await page.keyboard.press('Escape');
+      check('Esc closes the panel', await page.isHidden('#lib-more-panel'));
+    }
     for (const [ft, label] of [['key_compat', 'Compatible keys'], ['bpm_half', 'Half/double'], ['verified', 'Verified only']]) {
       const b = `#lib-filters [data-ft="${ft}"]`;
+      await openMore();
       await page.click(b); await settle();
+      check(`More shows how many hidden filters are on (${ft})`, (await page.textContent('#lib-more-n')) === '1');
       const on = (await page.getAttribute(b, 'aria-pressed')) === 'true';
       const chip = (await page.textContent('#lib-chips')).includes(label);
+      await openMore();
       await page.click(b); await settle();
       check(`filter toggle ${ft} sets and clears`, on && chip && (await page.getAttribute(b, 'aria-pressed')) === 'false');
     }
@@ -454,11 +475,13 @@ function url(hash) {
         check('star column toggles', (await page.locator(`${rows} >> nth=0`).locator('.ib.star.on').count()) === 0);
         // New filter chip
         const newN = parseInt((await page.textContent('#lib-new-n')).replace(/\D/g, ''), 10);
+        await openMore();
         await page.click('#lib-new');
         await settle(500);
         check('New filter chip', (await page.locator('#lib-chips .chip').filter({ hasText: 'New' }).count()) === 1 && (await page.getAttribute('#lib-new', 'aria-pressed')) === 'true');
         check('New filter narrows the table', (await countOf('#lib-count')) > 0 && (await countOf('#lib-count')) <= newN && (await countOf('#lib-count')) < totalAll);
         await shot('11-collections');
+        await openMore();
         await page.click('#lib-new');
         await settle(400);
         check('New filter clears', (await countOf('#lib-count')) === totalAll);
@@ -528,6 +551,12 @@ function url(hash) {
       check('settings: volume slider', /^\d{1,3}$/.test(await page.inputValue('#set-vol')));
       check('settings: auto-audition checkbox', await page.isVisible('#set-auto'));
       check('settings: density control', (await page.locator('#set-density [role=radio]').count()) === 2);
+      {
+        const box = async (sel) => page.evaluate((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { top: Math.round(r.top), left: Math.round(r.left), right: Math.round(r.right) }; }, sel);
+        const startup = await box('[aria-labelledby="set-port-h"]'), help = await box('[aria-labelledby="set-help-h"]');
+        check('settings: no empty slot next to Startup', help.top === startup.top && help.left > startup.right, JSON.stringify({ startup, help }));
+        check('settings: says which Python runs the app', /Python \d+\.\d+\.\d+, (bundled with the app|installed on this PC)/.test(await page.textContent('#set-python')), await page.textContent('#set-python'));
+      }
       const about = await page.textContent('#set-about');
       check('settings: version, data folder and log file shown', /\d+\.\d+\.\d+/.test(about) && /Log file/.test(about) && /App data folder/.test(about), about.slice(0, 160));
       check('settings: no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
