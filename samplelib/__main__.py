@@ -18,10 +18,6 @@ from .store import Store, default_data_dir
 from .server import serve
 
 
-def _already_running(port: int) -> bool:  # kept for callers of the old helper
-    return winapp.is_our_server(port)
-
-
 def _open_window(url: str) -> None:
     """Prefer an Edge/Chrome app window (no tabs or address bar); fall back to the default browser."""
     quiet = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}

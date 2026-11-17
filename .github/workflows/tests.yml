@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           python -m samplelib --root "$RUNNER_TEMP/empty" --data-dir "$RUNNER_TEMP/data" --port 8799 --no-browser &
-          sleep 3
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://127.0.0.1:8799/api/state && break; sleep 1; done
           node tests/ui_smoke.js "http://127.0.0.1:8799/?fixture=1" "$RUNNER_TEMP/shots-fixture"
       - name: Full producer flow through the UI (disposable fixture)
         shell: bash

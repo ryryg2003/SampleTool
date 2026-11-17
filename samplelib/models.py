@@ -52,7 +52,7 @@ ARCHIVE_EXTS = {".zip", ".rar", ".7z", ".tar", ".gz"}
 BROWSER_PLAYABLE = {".wav", ".mp3", ".ogg", ".opus", ".flac", ".m4a"}
 
 # Metadata provenance
-Source = Literal["tag", "filename", "folder", "inference", "analysis", "manual"]
+Source = Literal["tag", "filename", "folder", "pack", "inference", "analysis", "manual"]
 
 
 class Field(TypedDict):

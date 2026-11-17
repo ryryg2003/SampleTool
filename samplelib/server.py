@@ -25,7 +25,7 @@ from .store import Store
 #   post(handler, path, b) -> bool  return True when it handled (and answered) the POST
 #   MUTATING: set[str]              POST paths refused while an approved run is executing
 #   state(app) -> dict              extra keys merged into GET /api/state
-EXTENSION_NAMES = ("undo", "media", "collections", "freesound", "settings")
+EXTENSION_NAMES = ("undo", "media", "collections", "settings")
 
 
 def _load_extensions() -> list:
@@ -379,7 +379,8 @@ class Handler(BaseHTTPRequestHandler):
             if role and role not in matching.ROLES:
                 raise ValueError("Unknown role: " + role)
             return self._send(200, {"items": matching.matches(
-                st, m.group(1), role, int(q.get("limit") or 30))})
+                st, m.group(1), role, int(q.get("limit") or 30),
+                loose=q.get("loose") in ("1", "true"))})
         m = re.fullmatch(r"/api/samples/([\w-]+)", path)
         if m:
             it = st.by_id[m.group(1)]
@@ -601,7 +602,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, matching.starter(
                 st, b.get("key") or None, float(bpm) if bpm else None,
                 b.get("locked") or {}, int(b["seed"]) if b.get("seed") else None,
-                b.get("avoid") or {}))
+                b.get("avoid") or {}, loose=bool(b.get("loose")), genre=b.get("genre") or None))
         if path == "/api/starters":
             bpm = b.get("bpm")
             return self._send(200, {"ok": True, "starter": st.save_starter(

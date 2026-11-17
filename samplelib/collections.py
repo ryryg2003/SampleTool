@@ -27,7 +27,7 @@ MAX_NAME = 80
 # Query parameters a smart collection may store (same names as GET /api/samples).
 SMART_KEYS = ("q", "pack", "manufacturer", "category", "instrument", "loop_type", "key",
               "genre", "kit", "kind", "status", "origin", "bpm_min", "bpm_max", "new", "fav",
-              "collection")
+              "collection", "key_compat", "bpm_half", "verified")
 NO_HASH_REASON = ("can't be starred or collected: the file could not be fingerprinted "
                   "(SHA-256 failed), so it has no stable identity")
 

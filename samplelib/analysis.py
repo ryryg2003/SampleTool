@@ -16,7 +16,7 @@ import math
 import struct
 import sys
 
-ANALYSIS_VERSION = 1
+ANALYSIS_VERSION = 2
 MAX_SECONDS = 30.0
 DECODABLE = {".wav", ".aif", ".aiff", ".aifc"}
 TARGET_FS = 11025
@@ -319,18 +319,29 @@ def _root(x, fs):
     return NOTES[i], round(max(0.3, min(0.9, 1 - rest / top)), 2)
 
 
+def rms_db(x):
+    """RMS loudness in dBFS (0 = full scale square wave), one decimal."""
+    if not x:
+        return None
+    ms = sum(v * v for v in x) / len(x)
+    return round(10 * math.log10(ms), 1) if ms > 1e-12 else None
+
+
 # ------------------------------------------------------------------ public
 def analyze(path: str, ext: str, want=frozenset({"tempo", "key"})):
-    """want: "tempo" (bpm, bars, downbeat), "key" (scale key), "root" (one-shot pitch)."""
+    """want: "tempo" (bpm, bars, downbeat), "key" (scale key), "root" (one-shot pitch).
+    Loudness (rms_db, dBFS over the decoded audio) is always measured."""
     dec = decode(path, ext)
     if dec is None:
         return None, ["audio analysis: could not decode %s" % (ext or "file")]
     x, fs, dur = dec
     res = {"v": ANALYSIS_VERSION, "bpm": None, "bpm_conf": None, "bars": None,
-           "on_grid": None, "downbeat_ms": None, "key": None, "key_conf": None}
-    peak = max(abs(v) for v in x)
+           "on_grid": None, "downbeat_ms": None, "key": None, "key_conf": None,
+           "rms_db": None}
+    peak = max(abs(v) for v in x) if x else 0.0
     if peak < 1e-3:
         return res, []
+    res["rms_db"] = rms_db(x)
     first = next(i for i, v in enumerate(x) if abs(v) >= 0.1 * peak)
     res["downbeat_ms"] = round(first / fs * 1000, 1)
     if "tempo" in want and dur >= 1.0:
@@ -377,6 +388,17 @@ def camelot(key):
         pc = (pc + 3) % 12  # relative major shares the number
     num = ((pc * 7) % 12 + 7) % 12 + 1  # C major = 8B
     return "%d%s" % (num, "A" if minor else "B")
+
+
+@functools.lru_cache(maxsize=4096)
+def relative_key(key):
+    """Am -> C, C -> Am; None when unknown."""
+    k = norm_key(key)
+    if not k:
+        return None
+    if k.endswith("m"):
+        return NOTES[(NOTES.index(k[:-1]) + 3) % 12]
+    return NOTES[(NOTES.index(k) - 3) % 12] + "m"
 
 
 @functools.lru_cache(maxsize=4096)

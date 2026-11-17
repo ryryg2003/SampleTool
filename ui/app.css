@@ -369,7 +369,7 @@ button.rs:hover { border-color: var(--muted); }
 .prov { background: var(--raised); color: var(--muted); font-weight: 600; padding: 2px 6px; }
 .prov b { font-weight: 600; color: var(--muted); font-size: 10.5px; }
 .prov-tag { color: #9fe9ff; } .prov-manual { color: #9fe9ff; background: color-mix(in srgb, var(--move) 16%, transparent); }
-.prov-filename { color: #d7c4ff; } .prov-folder { color: #b8f5d8; }
+.prov-filename { color: #d7c4ff; } .prov-folder, .prov-pack { color: #b8f5d8; }
 .prov-inference, .prov-analysis { color: var(--warn-ink); }
 .prov.conf-lo { box-shadow: inset 0 -2px 0 var(--hold); }
 .prov.conf-lo b { color: var(--hold); }

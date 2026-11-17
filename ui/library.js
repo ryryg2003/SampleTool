@@ -4,8 +4,9 @@
 
 const CATEGORY_LIST = ['One-Shots/Drums', 'One-Shots/Bass & 808s', 'One-Shots/Instruments', 'One-Shots/FX & Vocals',
   'Loops/Drum Loops', 'Loops/Melody Loops', 'Loops/Bass Loops', 'Loops/Vocal & FX Loops', 'Presets & MIDI', 'Unsorted'];
-const FILTER_LABEL = { category: 'Category', instrument: 'Instrument', loop_type: 'Type', key: 'Key', genre: 'Genre', manufacturer: 'Maker', bpm_min: 'BPM ≥', bpm_max: 'BPM ≤', status: 'Status', pack: 'Pack', q: 'Search', coll: 'Collection', new: 'New' };
-const FILTER_KEYS = ['category', 'instrument', 'loop_type', 'key', 'genre', 'manufacturer', 'bpm_min', 'bpm_max', 'status'];
+const FILTER_LABEL = { key_compat: 'Key', bpm_half: 'BPM', verified: 'Only', category: 'Category', instrument: 'Instrument', loop_type: 'Type', key: 'Key', genre: 'Genre', manufacturer: 'Maker', bpm_min: 'BPM ≥', bpm_max: 'BPM ≤', status: 'Status', pack: 'Pack', q: 'Search', coll: 'Collection', new: 'New' };
+const FILTER_KEYS = ['category', 'instrument', 'loop_type', 'key', 'genre', 'manufacturer', 'bpm_min', 'bpm_max', 'status', 'key_compat', 'bpm_half', 'verified'];
+const TOGGLE_FILTERS = { key_compat: 'Compatible keys', bpm_half: 'Half/double', verified: 'Verified only' };
 const NO_HASH_TIP = 'Can’t star or collect: this file could not be fingerprinted (SHA-256 failed)';
 function starTip(r) {
   if (!r.sha256) return NO_HASH_TIP;
@@ -79,7 +80,7 @@ const Library = {
         { key: 'pack', label: 'Pack', sort: 'pack', width: 'minmax(56px, .8fr)', cls: 'c-pack', title: (r) => r.pack || '', render: (r) => `<span class="ellip">${esc(r.pack ? shortPack(r.pack, r.manufacturer) : (r.origin === 'library' ? 'In library' : '—'))}</span>` },
         { key: 'inst', label: 'Instrument', width: 'minmax(84px, .95fr)', cls: 'c-inst', title: (r) => r.category || '', render: (r) => catTag(r.category, r.instrument || Fmt.catShort(r.category) || '—') },
         { key: 'bpm', label: 'BPM', sort: 'bpm', width: '44px', cls: 'num', render: (r) => estMark(r, 'bpm', Fmt.bpm(r.bpm)) },
-        { key: 'key', label: 'Key', sort: 'key', width: '42px', cls: 'c-key', render: (r) => estMark(r, 'key', r.key || '') },
+        { key: 'key', label: 'Key', sort: 'key', width: '42px', cls: 'c-key', render: (r) => (!r.key && r.no_key ? '<span class="dim nokey" title="Drums, FX and noise: no musical key">none</span>' : estMark(r, 'key', r.key || '')) },
         { key: 'bars', label: 'Bars', width: '38px', cls: 'num', render: (r) => r.bars ? `${esc(r.bars)}${r.on_grid === false ? '<span class="offgrid" title="Starts late: not on the downbeat">◂</span>' : ''}` : '' },
         { key: 'dur', label: 'Length', sort: 'duration', width: '50px', cls: 'num', render: (r) => r.duration_s ? Fmt.dur(r.duration_s) : '' },
         { key: 'size', label: 'Size', sort: 'size', width: '54px', cls: 'num', render: (r) => Fmt.bytes(r.size) },
@@ -121,6 +122,11 @@ const Library = {
       const h = () => { const v = el.value.trim(); if (v) this.filters[el.dataset.f] = v; else delete this.filters[el.dataset.f]; this.apply(); };
       el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', el.tagName === 'SELECT' ? h : debounce(h, 300));
     });
+    $$('#lib-filters [data-ft]').forEach((b) => b.addEventListener('click', () => {
+      const k = b.dataset.ft;
+      if (this.filters[k]) delete this.filters[k]; else this.filters[k] = '1';
+      this.apply();
+    }));
     $('#lib-clear').addEventListener('click', () => this.clearAll());
     $('#lib-allfiles').checked = this.allFiles;
     $('#lib-allfiles').addEventListener('change', () => { this.allFiles = $('#lib-allfiles').checked; Store.set('lib.allFiles', this.allFiles); this.apply(); });
@@ -245,7 +251,7 @@ const Library = {
     if (this.coll) chips.push(['coll', this.coll.name]);
     if (this.newOnly) chips.push(['new', 'since last run']);
     if (this.q) chips.push(['q', '“' + this.q + '”']);
-    for (const [k, v] of Object.entries(this.filters)) chips.push([k, k === 'category' ? Fmt.catShort(v) : k === 'status' ? STATUS_LABEL[v] || v : v]);
+    for (const [k, v] of Object.entries(this.filters)) chips.push([k, TOGGLE_FILTERS[k] ? TOGGLE_FILTERS[k] : k === 'category' ? Fmt.catShort(v) : k === 'status' ? STATUS_LABEL[v] || v : v]);
     $('#lib-chips').innerHTML = chips.map(([k, v]) => `<span class="chip"><span class="chip-k">${esc(FILTER_LABEL[k] || k)}</span> <span class="chip-v ellip">${esc(v)}</span><button type="button" class="chip-x" data-k="${k}" aria-label="Remove filter ${esc(FILTER_LABEL[k] || k)} ${esc(v)}"><svg><use href="#i-x"/></svg></button></span>`).join('');
     $$('#lib-chips .chip-x').forEach((b) => b.addEventListener('click', () => {
       const k = b.dataset.k;
@@ -260,6 +266,7 @@ const Library = {
     const nb = $('#lib-new'); nb.setAttribute('aria-pressed', this.newOnly ? 'true' : 'false'); nb.classList.toggle('is-set', this.newOnly);
     App.emit('lib-filters', this.params());
     $$('#lib-filters [data-f]').forEach((el) => el.classList.toggle('is-set', !!this.filters[el.dataset.f]));
+    $$('#lib-filters [data-ft]').forEach((b) => b.setAttribute('aria-pressed', String(!!this.filters[b.dataset.ft])));
     this.renderStats();
   },
 
@@ -462,7 +469,7 @@ const Library = {
   async loadMatches(id) {
     if (!this.current || this.current.kind !== 'audio') return;
     try {
-      const r = await API.get('/api/samples/' + encodeURIComponent(id) + '/matches', { role: this.matchRole || '', limit: 25 });
+      const r = await API.get('/api/samples/' + encodeURIComponent(id) + '/matches', { role: this.matchRole || '', limit: 25, loose: this.matchLoose ? 1 : '' });
       if (this.current && this.current.id === id) { this.matches = r.items; this.renderInspector(); }
     } catch (e) {
       if (this.current && this.current.id === id) { this.matches = []; this.matchErr = e.message; this.renderInspector(); }
@@ -472,10 +479,11 @@ const Library = {
     if (d.kind !== 'audio') return '';
     const role = this.matchRole || '';
     const roles = [['', 'All'], ['drums', 'Drums'], ['bass', 'Bass'], ['melody', 'Melody'], ['vocal-fx', 'Vocal & FX']];
-    const chips = roles.map(([v, l]) => `<button type="button" class="mchip${role === v ? ' on' : ''}" data-role="${v}" aria-pressed="${role === v}">${l}</button>`).join('');
+    const chips = roles.map(([v, l]) => `<button type="button" class="mchip${role === v ? ' on' : ''}" data-role="${v}" aria-pressed="${role === v}">${l}</button>`).join('')
+      + `<button type="button" class="mchip mloose${this.matchLoose ? ' on' : ''}" aria-pressed="${!!this.matchLoose}" title="Loose also allows neighbor keys and tempos a few percent apart">Loose</button>`;
     let body;
     if (this.matches === null) body = '<p class="dim small">Finding matches…</p>';
-    else if (!this.matches.length) body = `<p class="dim small">${esc(this.matchErr || 'No good matches yet. A sample needs a category, plus a tempo or key, to be matched.')}</p>`;
+    else if (!this.matches.length) body = `<p class="dim small">${esc(this.matchErr || (this.matchLoose ? 'No good matches yet. A sample needs a category, plus a tempo or key, to be matched.' : 'No exact matches: nothing shares this tempo (within 0.5%) and key. Try Loose for near matches.'))}</p>`;
     else body = `<ol class="mlist">${this.matches.map((m, i) => `<li class="mrow">
         <button type="button" class="ib mplay" data-i="${i}" aria-label="Play ${esc(m.row.name)}"><svg><use href="#i-${Player.isPlaying(m.row.id) ? 'stop' : 'play'}"/></svg></button>
         <button type="button" class="mname" data-i="${i}" title="Open ${esc(m.row.name)}"><span class="ellip">${esc(m.row.name)}</span><span class="dim mono small ellip">${esc([Fmt.catShort(m.row.category), m.row.bpm && Fmt.bpm(m.row.bpm) + ' BPM', m.row.key].filter(Boolean).join(' · '))}</span></button>
@@ -484,7 +492,8 @@ const Library = {
     return `<section class="matches" aria-label="Goes well with"><h3 class="side-h">Goes well with</h3><div class="mchips" role="group" aria-label="Filter matches by role">${chips}</div>${body}</section>`;
   },
   bindMatches() {
-    $$('#inspector .mchip').forEach((b) => { b.onclick = () => { this.matchRole = b.dataset.role; this.matches = null; this.renderInspector(); this.loadMatches(this.current.id); }; });
+    $$('#inspector .mchip:not(.mloose)').forEach((b) => { b.onclick = () => { this.matchRole = b.dataset.role; this.matches = null; this.renderInspector(); this.loadMatches(this.current.id); }; });
+    $$('#inspector .mloose').forEach((b) => { b.onclick = () => { this.matchLoose = !this.matchLoose; this.matches = null; this.renderInspector(); this.loadMatches(this.current.id); }; });
     $$('#inspector .mplay').forEach((b) => { b.onclick = () => { Player.toggle(this.matches[+b.dataset.i].row); this.renderInspector(); }; });
     $$('#inspector .mname').forEach((b) => { b.onclick = () => this.inspect(this.matches[+b.dataset.i].row); });
   },

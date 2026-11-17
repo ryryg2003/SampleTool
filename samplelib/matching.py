@@ -71,6 +71,83 @@ def note_in_key(root, key):
     return 0.1, "%s is outside %s" % (r, k)
 
 
+# ------------------------------------------------------------------ strict rules
+# Strict (the default) only pairs loops that will sound right with no stretching:
+# tempo within 0.5% (also at half or double time), bass and melody in the same key
+# or its relative major/minor, loop lengths that divide evenly. Drums ignore key.
+# "Loose" keeps the older scored behavior (Camelot neighbors, 2-6% tempo).
+TEMPO_TOL = 0.005
+
+
+def _bars_from_duration(dur, bpm):
+    if not dur or not bpm:
+        return None
+    bars = dur * bpm / 240.0
+    for q in (1, 2, 4, 8, 16, 32):
+        if abs(bars - q) <= 0.02 * q:
+            return q
+    return None
+
+
+def tempo_ok(a, b):
+    """-> (ok, reason): a and b within 0.5%, directly or at half/double time."""
+    if not a or not b:
+        return False, "tempo unknown"
+    for m, label in ((1, "same tempo"), (2, "half-time"), (0.5, "double-time")):
+        if abs(a - b * m) / a <= TEMPO_TOL:
+            return True, label
+    return False, "tempo %g BPM is not within 0.5%% of %g (or half/double)" % (
+        round(b, 1), round(a, 1))
+
+
+def key_ok(a, b):
+    """-> (ok, reason): same key or relative major/minor only."""
+    ka, kb = analysis.norm_key(a), analysis.norm_key(b)
+    if not ka or not kb:
+        return False, "key unknown"
+    ca, cb = analysis.camelot(ka), analysis.camelot(kb)
+    if ka == kb:
+        return True, "same key"
+    if ca[:-1] == cb[:-1]:
+        return True, "relative major/minor"
+    return False, "key %s does not match %s (needs same or relative key)" % (kb, ka)
+
+
+def bars_ok(a, b):
+    if not a or not b:
+        return True
+    q = max(a, b) / min(a, b)
+    return q.is_integer() and int(q) & (int(q) - 1) == 0
+
+
+def _needs_key(f):
+    return f.role in ("bass", "melody") or (f.role == "vocal-fx" and f.key)
+
+
+def strict_ok(a, b):
+    """-> (ok, why_not) for F b next to F a under the strict rules."""
+    if a.loop and b.loop:
+        ok, why = tempo_ok(a.bpm, b.bpm)
+        if not ok:
+            return False, why
+        if not bars_ok(a.bars, b.bars):
+            return False, "%g bars does not divide evenly with %g bars" % (b.bars, a.bars)
+    if a.role != "drums" and b.role != "drums" and _needs_key(a) and _needs_key(b):
+        if not a.loop and not b.loop:
+            ra, rb = (a.key or "").rstrip("m"), (b.key or "").rstrip("m")
+            if not ra or ra != rb:
+                return False, "different root notes"
+        elif not a.loop or not b.loop:
+            one, loop = (a, b) if not a.loop else (b, a)
+            if note_in_key(one.key, loop.key)[0] < 0.8:
+                return False, "root note not in key"
+        else:
+            ok, why = key_ok(a.key, b.key)
+            if not ok:
+                return False, why
+    return True, ""
+
+
 class F:
     """Matching features of one item, read once per store generation."""
     __slots__ = ("it", "role", "loop", "bpm", "key", "bars", "grid", "kit", "pack")
@@ -80,6 +157,8 @@ class F:
         self.it, self.role, self.loop = it, role_of(it), _is_loop(it)
         self.bpm, self.key = _mv(it, "bpm"), analysis.norm_key(_mv(it, "key"))
         self.bars, self.grid = an.get("bars"), an.get("on_grid")
+        if not self.bars and self.loop and self.bpm:
+            self.bars = _bars_from_duration((it.get("audio") or {}).get("duration_s"), self.bpm)
         self.kit, self.pack = it.get("kit_id"), it.get("pack")
 
 
@@ -173,7 +252,7 @@ def score_pair(a, b):
     return min(1.0, score), reasons
 
 
-def ranked(store, src, role=None, min_score=0.3, feats=None, limit=None):
+def ranked(store, src, role=None, min_score=0.3, feats=None, limit=None, loose=False):
     """-> [(score, reasons, item)] best first; never src, its duplicates or excluded items."""
     feats = feats if feats is not None else features(store)
     a = feats.get(src["id"]) or F(src)
@@ -184,6 +263,8 @@ def ranked(store, src, role=None, min_score=0.3, feats=None, limit=None):
         if b is a or fid == src["id"] or fid in near or (role and b.role != role):
             continue
         if sha and b.it.get("sha256") == sha:
+            continue
+        if not loose and not strict_ok(a, b)[0]:
             continue
         s = _fast_score(a, b)
         if not role and a.role and b.role == a.role:
@@ -196,11 +277,12 @@ def ranked(store, src, role=None, min_score=0.3, feats=None, limit=None):
     return [(s, score_pair(a, b)[1], b.it) for s, b in out]
 
 
-def matches(store, item_id, role=None, limit=30):
+def matches(store, item_id, role=None, limit=30, loose=False):
     with store.lock:
         src = store.by_id[item_id]
         return [{"row": store.row(it), "score": s, "reasons": r}
-                for s, r, it in ranked(store, src, role, limit=max(1, min(200, limit)))]
+                for s, r, it in ranked(store, src, role, limit=max(1, min(200, limit)),
+                                       loose=loose)]
 
 
 # ------------------------------------------------------------------ Beat Starter
@@ -215,17 +297,48 @@ def _target(key, bpm):
     return t
 
 
-def starter(store, key=None, bpm=None, locked=None, seed=None, avoid=None):
+def _why_empty(slot, target, pool, chosen):
+    """Plain-English reason a slot stayed empty under the strict rules."""
+    if not pool:
+        return "No %s loops in your library yet" % slot
+    counts = {}
+    for f in pool:
+        ok, why = strict_ok(target, f)
+        if ok:
+            why = next((strict_ok(c, f)[1] for c in chosen if not strict_ok(c, f)[0]),
+                       "does not fit the other picks")
+        k = ("tempo" if "tempo" in why else "key" if "key" in why or "root" in why
+             else "length" if "bars" in why else "fit")
+        counts[k] = counts.get(k, 0) + 1
+    label = {"tempo": "wrong tempo", "key": "wrong key", "length": "loop length does not line up",
+             "fit": "clash with the other picks"}
+    parts = ", ".join("%d %s" % (n, label[k]) for k, n in sorted(counts.items(), key=lambda t: -t[1]))
+    want = []
+    if slot != "drums" and target.key:
+        rel = analysis.relative_key(target.key)
+        want.append("in %s%s" % (target.key, " or " + rel if rel else ""))
+    if target.bpm:
+        want.append("at %g BPM (\u00b10.5%%, or half/double)" % round(target.bpm, 1))
+    return "No %s loop fits %s. Checked %d: %s." % (slot, " ".join(want) or "this set",
+                                                   len(pool), parts)
+
+
+def starter(store, key=None, bpm=None, locked=None, seed=None, avoid=None, loose=False,
+            genre=None):
     """Pick a drum loop, bass and melody that fit together.
 
     Locked slots ({slot: item id}) are kept and set key/tempo when none are
     given. avoid ({slot: id}) skips that pick when another fits (reroll).
+    Strict (default): every pick passes strict_ok against the target and the
+    other picks, else the slot stays empty with a reason. loose=True uses the
+    older scored rules. genre prefers loops tagged with that genre.
     Same arguments and seed -> same result."""
     import random
     if seed is None:
         seed = random.randrange(1, 1_000_000)
     rng = random.Random(seed)
     locked = {k: v for k, v in (locked or {}).items() if k in SLOTS and v}
+    genre = (genre or "").strip().casefold() or None
     with store.lock:
         feats = features(store)
         pools = {r: sorted((f for f in feats.values() if f.loop and f.role == r),
@@ -239,10 +352,20 @@ def starter(store, key=None, bpm=None, locked=None, seed=None, avoid=None):
                     break
         if not bpm:
             bpm = next((f.bpm for f in fixed.values() if f.bpm), None)
+
+        def in_genre(f):
+            return bool(genre) and (_genre_of(f.it) or "").casefold() == genre
+
         if not key or not bpm:
-            seeds = [f for f in pools["melody"] + pools["bass"] if f.key and f.bpm
-                     and (not key or analysis.key_compat(f.key, key)[0] >= 0.9)
-                     and (not bpm or _tempo_val(bpm, f.bpm) >= 0.8)]
+            if loose:
+                seeds = [f for f in pools["melody"] + pools["bass"] if f.key and f.bpm
+                         and (not key or analysis.key_compat(f.key, key)[0] >= 0.9)
+                         and (not bpm or _tempo_val(bpm, f.bpm) >= 0.8)]
+            else:
+                seeds = [f for f in pools["melody"] + pools["bass"] if f.key and f.bpm
+                         and (not key or key_ok(key, f.key)[0])
+                         and (not bpm or tempo_ok(bpm, f.bpm)[0])]
+            seeds = [f for f in seeds if in_genre(f)] or seeds
             if seeds:
                 pick = rng.choice(seeds)
                 key, bpm = key or pick.key, bpm or pick.bpm
@@ -251,23 +374,38 @@ def starter(store, key=None, bpm=None, locked=None, seed=None, avoid=None):
         target = _target(key, bpm)
         slots, missing, options = {}, {}, {}
         avoid = avoid or {}
-        for slot in SLOTS:
+        chosen = list(fixed.values())
+        for slot in ("melody", "bass", "drums"):
             if slot in fixed:
                 f = fixed[slot]
             else:
                 scored = sorted(((_fast_score(target, f), f) for f in pools[slot]),
                                 key=lambda t: (-t[0], t[1].it["id"]))
-                good = [f for s, f in scored if s >= 0.75][:8]
+                if loose:
+                    good = [f for s, f in scored if s >= 0.75][:8]
+                else:
+                    good = [f for s, f in scored if strict_ok(target, f)[0]
+                            and all(strict_ok(c, f)[0] for c in chosen)][:8]
+                    good = [f for f in good if in_genre(f)] or good
                 options[slot] = len(good)
                 fresh = [f for f in good if f.it["id"] != avoid.get(slot)]
                 f = rng.choice(fresh or good) if good else None
             if f is None:
                 slots[slot] = None
-                missing[slot] = "No %s loops fit %s at %s BPM" % (
-                    slot, key or "any key", ("%g" % bpm) if bpm else "any tempo")
+                if loose:
+                    missing[slot] = "No %s loops fit %s at %s BPM" % (
+                        slot, key or "any key", ("%g" % bpm) if bpm else "any tempo")
+                else:
+                    missing[slot] = _why_empty(slot, target, pools[slot], chosen)
                 continue
+            if f not in chosen:
+                chosen.append(f)
             s, reasons = score_pair(target, f)
             slots[slot] = {"row": store.row(f.it), "score": round(s, 3), "reasons": reasons,
                            "locked": slot in locked}
-        return {"key": key, "bpm": bpm, "seed": seed, "slots": slots, "missing": missing,
-                "options": options}
+        return {"key": key, "bpm": bpm, "seed": seed, "loose": bool(loose), "genre": genre,
+                "slots": {k: slots[k] for k in SLOTS}, "missing": missing, "options": options}
+
+
+def _genre_of(it):
+    return _mv(it, "genre")
