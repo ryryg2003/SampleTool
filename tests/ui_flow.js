@@ -170,7 +170,8 @@ async function waitIdle(timeout = 60000) {
       await page.evaluate(() => { const a = document.getElementById('audio'); a.currentTime = 0.4; });
       await page.keyboard.press('ArrowDown');
       const rt = await page.evaluate(() => ({ t: document.getElementById('audio').currentTime, paused: document.getElementById('audio').paused }));
-      check('retrigger restarts from the top on arrow keys', rt.t < 0.2 && !rt.paused, JSON.stringify(rt));
+      // it was parked at 0.4 s; anything clearly below means it restarted (slow CI runners play a little before we read)
+      check('retrigger restarts from the top on arrow keys', rt.t < 0.35 && !rt.paused, JSON.stringify(rt));
       await page.keyboard.press('o');
       await page.keyboard.press('l');
       await page.evaluate(() => Player.stop());
