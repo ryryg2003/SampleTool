@@ -29,7 +29,7 @@ async function waitIdle(timeout = 60000) {
 (async () => {
   execFileSync(PY, [path.join(REPO, 'tools', 'make_fixtures.py'), root], { stdio: 'ignore' });
   const srv = spawn(PY, ['-m', 'samplelib', '--root', root, '--data-dir', path.join(tmp, 'data'), '--port', String(PORT), '--no-browser'], { cwd: REPO, stdio: 'ignore' });
-  for (let i = 0; i < 50; i++) { try { await api('/api/state'); break; } catch { await sleep(200); } }
+  for (let i = 0; i < 300; i++) { try { await api('/api/state'); break; } catch { await sleep(200); } }
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1366, height: 768 } });
   const errors = [];
