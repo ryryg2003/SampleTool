@@ -13,8 +13,11 @@ from __future__ import annotations
 import array
 import functools
 import math
+import operator
 import struct
 import sys
+
+_mul = operator.mul
 
 ANALYSIS_VERSION = 2
 MAX_SECONDS = 30.0
@@ -51,10 +54,9 @@ def _to_mono(data: bytes, ch: int, bits: int, enc: str, big: bool, fs_in: int):
     elif bits == 24:
         n = len(data) // 3
         out = bytearray(4 * n)
-        src = memoryview(data)[:3 * n]
         order = (2, 1, 0) if big else (0, 1, 2)
         for j, o in enumerate(order):
-            out[1 + j::4] = src[o::3]
+            out[1 + j::4] = data[o:3 * n:3]  # bytes slicing; a strided memoryview is ~4x slower
         data, big = bytes(out), False
         a = array.array("i")
         scale = 1 / 2147483648
@@ -74,7 +76,16 @@ def _to_mono(data: bytes, ch: int, bits: int, enc: str, big: bool, fs_in: int):
     d = max(1, round(fs_in / TARGET_FS))
     step = d * ch
     k = scale / step
-    x = [(sum(a[i:i + step]) - off * d) * k for i in range(0, len(a) - step + 1, step)]
+    n = len(a) // step
+    # Mono mix and decimation in one: output i is the mean of the step raw samples
+    # a[i*step : (i+1)*step] (every channel of d frames). Zipping the step strided
+    # slices runs at C speed instead of one Python-level sum() per output sample.
+    acc = list(map(sum, zip(*[a[j:n * step:step] for j in range(step)])))
+    base = off * d
+    if base:
+        x = [(v - base) * k for v in acc]
+    else:
+        x = list(map(float(k).__mul__, acc))
     return x, fs_in / d
 
 
@@ -185,7 +196,8 @@ def _envelope(x):
     prev = 0.0
     env = []
     for i in range(0, len(x) - HOP + 1, HOP):
-        e = math.sqrt(sum(v * v for v in x[i:i + HOP]) / HOP)
+        seg = x[i:i + HOP]
+        e = math.sqrt(sum(map(_mul, seg, seg)) / HOP)
         env.append(e - prev if e > prev else 0.0)
         prev = e
     if not env:
@@ -207,12 +219,37 @@ def _ac(env, lag):
     return s / (n - lo - 1)
 
 
-def _tempo_score(env, frame_rate, bpm):
+class _AC:
+    """_ac(env, lag) for many lags, fast: each whole-lag product sum is computed
+    once (at C speed) and reused, then interpolated exactly like _ac."""
+
+    def __init__(self, env):
+        self.env, self.n, self.raw = env, len(env), {}
+
+    def _r(self, lag):
+        r = self.raw.get(lag)
+        if r is None:
+            env = self.env
+            r = self.raw[lag] = sum(map(_mul, env, env[lag:]))
+        return r
+
+    def __call__(self, lag):
+        n, lo = self.n, int(lag)
+        fr = lag - lo
+        if lo + 1 >= n:
+            return 0.0
+        # _ac sums i < n-lo-1: the lag-lo sum minus its last term, and the full lag-(lo+1) sum.
+        a = self._r(lo) - self.env[n - lo - 1] * self.env[n - 1]
+        return ((1 - fr) * a + fr * self._r(lo + 1)) / (n - lo - 1)
+
+
+def _tempo_score(env, frame_rate, bpm, ac=None):
+    ac = ac or (lambda lag: _ac(env, lag))
     beat = 60.0 * frame_rate / bpm
     total, used = 0.0, 0
     for k in (1, 2, 4):
         if beat * k < len(env) * 0.6:
-            total += _ac(env, beat * k)
+            total += ac(beat * k)
             used += 1
     if not used:
         return 0.0
@@ -225,18 +262,19 @@ def _tempo(x, fs, dur):
     frame_rate = fs / HOP
     if len(env) < 16:
         return None, None
-    var = _ac(env, 0)
+    ac = _AC(env)
+    var = ac(0)
     if var <= 1e-12:
         return None, None
     best, best_s = None, -1.0
     b = BPM_LO
     while b <= BPM_HI:
-        s = _tempo_score(env, frame_rate, b)
+        s = _tempo_score(env, frame_rate, b, ac)
         if s > best_s:
             best, best_s = b, s
         b += 0.5
     for d in (-0.4, -0.3, -0.2, -0.1, 0.1, 0.2, 0.3, 0.4):
-        s = _tempo_score(env, frame_rate, best + d)
+        s = _tempo_score(env, frame_rate, best + d, ac)
         if s > best_s:
             best, best_s = best + d, s
     if best_s <= 0:
@@ -244,7 +282,7 @@ def _tempo(x, fs, dur):
     # Bar-length prior: a trimmed loop is a whole number of 4/4 bars long.
     fits = [240.0 * bars / dur for bars in (1, 2, 4, 8, 16, 32)]
     fits = [f for f in fits if BPM_LO <= f <= BPM_HI]
-    scored = [(_tempo_score(env, frame_rate, f), f) for f in fits]
+    scored = [(_tempo_score(env, frame_rate, f, ac), f) for f in fits]
     for s, f in sorted(scored, reverse=True):
         near = min(abs(f - best * m) / f for m in (0.5, 1.0, 2.0))
         if near < 0.03 and s >= 0.6 * best_s:
@@ -323,7 +361,7 @@ def rms_db(x):
     """RMS loudness in dBFS (0 = full scale square wave), one decimal."""
     if not x:
         return None
-    ms = sum(v * v for v in x) / len(x)
+    ms = sum(map(_mul, x, x)) / len(x)
     return round(10 * math.log10(ms), 1) if ms > 1e-12 else None
 
 
@@ -338,7 +376,7 @@ def analyze(path: str, ext: str, want=frozenset({"tempo", "key"})):
     res = {"v": ANALYSIS_VERSION, "bpm": None, "bpm_conf": None, "bars": None,
            "on_grid": None, "downbeat_ms": None, "key": None, "key_conf": None,
            "rms_db": None}
-    peak = max(abs(v) for v in x) if x else 0.0
+    peak = max(max(x), -min(x)) if x else 0.0
     if peak < 1e-3:
         return res, []
     res["rms_db"] = rms_db(x)
@@ -360,6 +398,14 @@ def analyze(path: str, ext: str, want=frozenset({"tempo", "key"})):
     elif "root" in want:
         res["key"], res["key_conf"] = _root(x, fs)
     return res, []
+
+
+def analyze_job(path: str, ext: str, want):
+    """analyze() for a worker process: never raises, so one bad file cannot stop a pool."""
+    try:
+        return analyze(path, ext, want)
+    except Exception as e:  # noqa: BLE001
+        return None, ["audio analysis failed: %s" % e]
 
 
 # ------------------------------------------------------------------ keys
