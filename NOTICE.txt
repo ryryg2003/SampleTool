@@ -1,8 +1,14 @@
 Sample Library Organizer
 Copyright (c) 2026 the Sample Library Organizer author. All rights reserved.
 
-This program uses only the Python standard library and plain HTML, CSS and
-JavaScript. It contains no third-party code and needs no internet connection.
+The app itself uses only the Python standard library and plain HTML, CSS and
+JavaScript. It needs no internet connection.
+
+The "python" folder holds the official Windows embeddable package of
+Python 3.14.10 from python.org (Python Software Foundation), so the app runs
+without installing Python. It is unchanged except for one added line ("..")
+in python314._pth so it finds the app. Python and the libraries it ships
+with are covered by the licenses in python\LICENSE.txt.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. Keep a backup
 of your sample collection.

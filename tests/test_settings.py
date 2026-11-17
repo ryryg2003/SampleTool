@@ -135,6 +135,19 @@ class SettingsApiTest(unittest.TestCase):
         self.assertEqual(j["info"]["data_dir"], self.env.data)
         self.assertTrue(j["info"]["log_file"].endswith(os.path.join("logs", "app.log")))
         self.assertFalse(j["busy"])
+        py = j["info"]["python"]
+        self.assertEqual(py["version"], "%d.%d.%d" % sys.version_info[:3])
+        self.assertEqual(py["executable"], sys.executable)
+        on_bundled = os.path.normcase(os.path.dirname(os.path.abspath(sys.executable))) == \
+            os.path.normcase(os.path.join(REPO, "python"))
+        self.assertEqual(py["bundled"], on_bundled)
+
+    def test_python_info_spots_the_bundled_copy(self):
+        from samplelib import api_settings
+        exe = os.path.join(REPO, "python", "pythonw.exe")
+        self.assertTrue(api_settings.python_info(exe)["bundled"])
+        self.assertFalse(api_settings.python_info(os.path.join(REPO, "python-other", "python.exe"))["bundled"])
+        self.assertFalse(api_settings.python_info("")["bundled"])
 
     def test_post_partial(self):
         _, j = self.env.post("/api/settings", {"volume": 42})
@@ -587,6 +600,8 @@ class WindowsDesktopTest(unittest.TestCase):
             out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], env=dict(os.environ, LNK=lnk),
                                  capture_output=True, text=True, timeout=60).stdout.splitlines()
             self.assertTrue(out[0].lower().endswith("pythonw.exe"), out)
+            self.assertEqual(os.path.normcase(out[0]), os.path.normcase(os.path.join(REPO, "python", "pythonw.exe")),
+                             "the shortcut uses the bundled Python")
             self.assertEqual(out[1], "-m samplelib")
             self.assertEqual(os.path.normcase(out[2].rstrip("\\")), os.path.normcase(REPO))
             self.assertIn("app.ico", out[3])

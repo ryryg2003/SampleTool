@@ -3,7 +3,7 @@
 Usage: python tools/build_release.py [--out DIR]
 
 Creates <out>/SampleOrganizer-<version>.zip (default out: dist/) containing
-samplelib/, ui/, the launcher .bat files, README.md, CHANGELOG.md and
+samplelib/, ui/, python/ (the bundled Windows Python), the launcher .bat files, README.md, CHANGELOG.md and
 NOTICE.txt, all under a top-level "SampleOrganizer-<version>/" folder.
 Tests, tools, docs and caches are left out. The zip is deterministic: fixed
 timestamps and sorted entries, so the same source gives the same bytes.
@@ -18,7 +18,7 @@ import sys
 import zipfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-INCLUDE_DIRS = ("samplelib", "ui")
+INCLUDE_DIRS = ("samplelib", "ui", "python")
 INCLUDE_FILES = ("Launch Sample Organizer.bat", "Create Desktop Shortcut.bat",
                  "README.md", "CHANGELOG.md", "NOTICE.txt")
 SKIP_PARTS = {"__pycache__", ".pytest_cache"}
